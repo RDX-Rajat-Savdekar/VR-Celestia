@@ -53,12 +53,13 @@ namespace CelestiaVR.Planets
 
             // Find column positions from the header line after $$SOE
             // Horizons format has fixed-width columns; we use regex on each data line.
-            // Pattern: date string, then RA HH MM SS.ff, then Dec ±DD MM SS.f
-            // Example line: " 2026-Apr-06 00:00  03 45 09.97 +24 28 03.1 ..."
+            // Pattern: date string, optional visibility flags, then RA HH MM SS.ff, then Dec ±DD MM SS.f
+            // Example line: " 2026-Apr-06 00:00 Am  03 45 09.97 +24 28 03.1 ..."
+            // [^\d]+ skips any visibility flags (e.g. "Am", "A", "m", "C") between time and RA
             var raDecPattern = new Regex(
-                @"(\d{4}-\w{3}-\d{2}\s+\d{2}:\d{2})\s+" +  // date
-                @"(\d{2})\s+(\d{2})\s+(\d{2}\.\d+)\s+" +   // RA HH MM SS
-                @"([+-]\d{2})\s+(\d{2})\s+(\d{2}\.\d+)"    // Dec ±DD MM SS
+                @"(\d{4}-\w{3}-\d{2}\s+\d{2}:\d{2})[^\d]+" +  // date + skip flags
+                @"(\d{2})\s+(\d{2})\s+(\d{2}\.\d+)\s+" +       // RA HH MM SS
+                @"([+-]\d{2})\s+(\d{2})\s+(\d{2}\.\d+)"        // Dec ±DD MM SS
             );
 
             foreach (string line in lines)

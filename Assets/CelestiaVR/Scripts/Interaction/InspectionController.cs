@@ -28,18 +28,23 @@ namespace CelestiaVR.Interaction
         public float verticalOffset = 0f;
 
         [Header("Inspection Scale")]
-        [Tooltip("World-space size of the object when inspected (meters).")]
-        [Range(0.05f, 1f)]
-        public float inspectionSize = 0.25f;
+        [Tooltip("Hologram size multiplier relative to the planet's sky scale. 0.05 = palm-sized, 0.2 = basketball-sized.")]
+        [Range(0.01f, 1f)]
+        public float inspectionSize = 0.05f;
 
         [Header("Animation")]
         [Range(0.2f, 3f)]
         public float animationDuration = 0.8f;
         public AnimationCurve easeCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
+        [Header("Hologram")]
+        [Tooltip("Degrees per second the inspected copy rotates.")]
+        public float hologramSpinSpeed = 30f;
+
         private Camera _xrCamera;
         private CelestialBody _inspectedBody;
         private Coroutine _currentAnimation;
+        private GameObject _hologramCopy;
 
         private void Awake()
         {
@@ -66,8 +71,11 @@ namespace CelestiaVR.Interaction
 
         public void StartInspection(CelestialBody body)
         {
-            if (_inspectedBody != null)
-                SnapBackImmediate(_inspectedBody);
+            Debug.Log($"[InspectionController] StartInspection: {body.objectName}");
+
+            // Dismiss any current inspection first
+            if (_hologramCopy != null)
+                DismissHologram();
 
             _inspectedBody = body;
             body.isInspecting = true;
@@ -80,74 +88,80 @@ namespace CelestiaVR.Interaction
         public void ExitInspection()
         {
             if (_inspectedBody == null) return;
+            Debug.Log($"[InspectionController] ExitInspection: {_inspectedBody.objectName}");
 
-            var body = _inspectedBody;
+            _inspectedBody.isInspecting = false;
             _inspectedBody = null;
-            body.isInspecting = false;
 
             if (_currentAnimation != null)
                 StopCoroutine(_currentAnimation);
-            _currentAnimation = StartCoroutine(AnimateOut(body));
 
+            DismissHologram();
             inspectionPanel?.Hide();
+        }
+
+        private void DismissHologram()
+        {
+            if (_hologramCopy != null)
+            {
+                Destroy(_hologramCopy);
+                _hologramCopy = null;
+            }
+        }
+
+        private void Update()
+        {
+            if (_hologramCopy == null) return;
+
+            // Spin the hologram
+            _hologramCopy.transform.Rotate(Vector3.up, hologramSpinSpeed * Time.deltaTime, Space.Self);
+
+            // Smoothly follow the camera so it stays in front of the user
+            Vector3 target = GetInspectionWorldPosition();
+            _hologramCopy.transform.position = Vector3.Lerp(
+                _hologramCopy.transform.position, target, Time.deltaTime * 3f);
         }
 
         private IEnumerator AnimateIn(CelestialBody body)
         {
-            Vector3 startPos = body.transform.position;
-            Quaternion startRot = body.transform.rotation;
-            Vector3 startScale = body.transform.localScale;
+            // Spawn a copy — the original stays in the sky
+            _hologramCopy = Instantiate(body.gameObject);
+            _hologramCopy.name = $"{body.objectName}_Hologram";
 
+            // Remove CelestialBody/Collider from copy so it doesn't interfere with selection
+            var copyBody = _hologramCopy.GetComponent<CelestialBody>();
+            if (copyBody != null) Destroy(copyBody);
+            foreach (var col in _hologramCopy.GetComponentsInChildren<Collider>())
+                Destroy(col);
+
+            // Target scale: preserve the planet's normalized root scale, multiply by inspectionSize.
+            // This ensures km-scale GLBs (Saturn) appear the same hologram size as other planets.
+            Vector3 finalScale = body.transform.localScale * inspectionSize;
+
+            Vector3 spawnPos = GetInspectionWorldPosition();
+            _hologramCopy.transform.position = spawnPos;
+            _hologramCopy.transform.localScale = Vector3.zero;
+
+            Debug.Log($"[InspectionController] Hologram spawned for {body.objectName} at {spawnPos}, finalScale={finalScale}");
+
+            // Scale up from zero (sci-fi materialise effect)
             float elapsed = 0f;
             while (elapsed < animationDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = easeCurve.Evaluate(Mathf.Clamp01(elapsed / animationDuration));
 
-                Vector3 targetPos = GetInspectionWorldPosition();
-                Vector3 targetScale = Vector3.one * inspectionSize;
-
-                body.transform.position = Vector3.Lerp(startPos, targetPos, t);
-                body.transform.rotation = Quaternion.Slerp(startRot, Quaternion.identity, t);
-                body.transform.localScale = Vector3.Lerp(startScale, targetScale, t);
+                // Gently follow camera so it stays in front if user moves slightly
+                _hologramCopy.transform.position = Vector3.Lerp(spawnPos, GetInspectionWorldPosition(), t);
+                _hologramCopy.transform.localScale = Vector3.Lerp(Vector3.zero, finalScale, t);
+                spawnPos = _hologramCopy.transform.position; // update so lerp doesn't snap
 
                 yield return null;
             }
 
+            _hologramCopy.transform.localScale = finalScale;
             inspectionPanel?.Show(body);
-        }
-
-        private IEnumerator AnimateOut(CelestialBody body)
-        {
-            Vector3 startPos = body.transform.position;
-            Quaternion startRot = body.transform.rotation;
-            Vector3 startScale = body.transform.localScale;
-
-            float elapsed = 0f;
-            while (elapsed < animationDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = easeCurve.Evaluate(Mathf.Clamp01(elapsed / animationDuration));
-
-                body.transform.position = Vector3.Lerp(startPos, body.skyPosition, t);
-                body.transform.rotation = Quaternion.Slerp(startRot, body.skyRotation, t);
-                body.transform.localScale = Vector3.Lerp(startScale, body.skyScale, t);
-
-                yield return null;
-            }
-
-            // Snap to exact sky position
-            body.transform.position = body.skyPosition;
-            body.transform.rotation = body.skyRotation;
-            body.transform.localScale = body.skyScale;
-        }
-
-        private void SnapBackImmediate(CelestialBody body)
-        {
-            body.isInspecting = false;
-            body.transform.position = body.skyPosition;
-            body.transform.rotation = body.skyRotation;
-            body.transform.localScale = body.skyScale;
+            Debug.Log($"[InspectionController] {body.objectName} hologram fully materialised.");
         }
 
         private Vector3 GetInspectionWorldPosition()

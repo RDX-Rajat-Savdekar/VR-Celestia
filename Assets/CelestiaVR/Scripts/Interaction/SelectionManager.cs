@@ -38,6 +38,34 @@ namespace CelestiaVR.Interaction
         private void Awake()
         {
             _dwellSelector = FindFirstObjectByType<DwellSelector>();
+            if (_dwellSelector != null)
+            {
+                _dwellSelector.OnDwellSelect += HandleDwellSelect;
+                Debug.Log("[SelectionManager] Subscribed to DwellSelector.OnDwellSelect.");
+            }
+            else
+            {
+                Debug.LogWarning("[SelectionManager] No DwellSelector found — gaze-based selection disabled.");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_dwellSelector != null)
+                _dwellSelector.OnDwellSelect -= HandleDwellSelect;
+        }
+
+        private void HandleDwellSelect(CelestialBody body)
+        {
+            Debug.Log($"[SelectionManager] Dwell-selected: {body.objectName} → triggering inspection.");
+            if (_selectedBody != null && _selectedBody.isInspecting)
+            {
+                OnDeselect?.Invoke();
+                _selectedBody = null;
+                return;
+            }
+            _selectedBody = body;
+            OnObjectSelected?.Invoke(body);
         }
 
         private void OnEnable()
