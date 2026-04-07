@@ -74,3 +74,20 @@ Thumbs.db
 !/Assets/CelestiaVR_resources/Space\ Graphics\ Toolkit\ v4.1/*.meta
 !/Assets/CelestiaVR_resources/HYG_StarDataBase/*.meta
 !/Assets/CelestiaVR_resources/PlanetTextures/*.meta
+!/Assets/Plugins.meta
+
+# Android build output
+/BuildOutput/
+/AndroidBuild/
+/ExportedProject/
+/GradleProject/
+gradle-wrapper.jar
+local.properties
+
+# Unity build artifacts at project root
+*_DoNotShip/
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+.utmp/
+
+# Quest / Android device specific
+*.symbols.zip
