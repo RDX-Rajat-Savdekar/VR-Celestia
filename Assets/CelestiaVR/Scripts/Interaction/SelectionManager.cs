@@ -18,6 +18,9 @@ namespace CelestiaVR.Interaction
         [Tooltip("Right controller trigger select action (XRI Default / RightHand/Select).")]
         public InputActionReference selectAction;
 
+        [Tooltip("Button to dismiss the current inspection (B / Y button). Leave empty to disable.")]
+        public InputActionReference dismissAction;
+
         [Header("Raycast")]
         [Tooltip("Transform used as raycast origin (right controller attach point).")]
         public Transform rayOrigin;
@@ -72,12 +75,23 @@ namespace CelestiaVR.Interaction
         {
             if (selectAction != null)
                 selectAction.action.performed += HandleSelectPerformed;
+            if (dismissAction != null)
+                dismissAction.action.performed += HandleDismissPerformed;
         }
 
         private void OnDisable()
         {
             if (selectAction != null)
                 selectAction.action.performed -= HandleSelectPerformed;
+            if (dismissAction != null)
+                dismissAction.action.performed -= HandleDismissPerformed;
+        }
+
+        private void HandleDismissPerformed(InputAction.CallbackContext ctx)
+        {
+            if (_selectedBody == null) return;
+            OnDeselect?.Invoke();
+            _selectedBody = null;
         }
 
         private void Update()

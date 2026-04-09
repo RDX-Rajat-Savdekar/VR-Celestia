@@ -96,6 +96,10 @@ namespace CelestiaVR.Core
             // Tilt by latitude so the pole is at the correct elevation
             float tiltX = -(90f - observerLatitude);
             transform.rotation = Quaternion.Euler(tiltX, rotY, 0f);
+
+            // Keep the panoramic skybox in sync with sidereal rotation
+            if (RenderSettings.skybox != null)
+                RenderSettings.skybox.SetFloat("_Rotation", rotY);
         }
 
         /// <summary>
@@ -108,5 +112,19 @@ namespace CelestiaVR.Core
         }
 
         public DateTime SimulatedTime => _simulatedTime;
+
+        /// <summary>
+        /// Directly offset the simulated time by a given number of seconds.
+        /// Call this from TimeScrollController to drive time-scrubbing.
+        /// Forces an immediate sky + planet update.
+        /// </summary>
+        public void OffsetSimulatedTime(double seconds)
+        {
+            _simulatedTime = _simulatedTime.AddSeconds(seconds);
+            _accumulatedSeconds = 0f; // reset accumulator so Update() doesn't double-advance
+            ApplySkyRotation();
+            if (_planetController != null)
+                _planetController.UpdatePositions(_simulatedTime);
+        }
     }
 }
