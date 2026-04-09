@@ -78,7 +78,7 @@ namespace CelestiaVR.Core
             return -lst * 15f; // 15 degrees per hour
         }
 
-        private static double DateTimeToJulianDate(DateTime dt)
+        public static double DateTimeToJulianDate(DateTime dt)
         {
             int y = dt.Year;
             int m = dt.Month;
@@ -126,6 +126,51 @@ namespace CelestiaVR.Core
                 float s = (t - 0.75f) / 0.25f;
                 return Color.Lerp(new Color(1.0f, 0.65f, 0.3f), new Color(1.0f, 0.3f, 0.1f), s);
             }
+        }
+
+        /// <summary>
+        /// Computes the Sun's equatorial coordinates (RA hours, Dec degrees) using the
+        /// simplified Jean Meeus low-precision solar position algorithm (~0.01° accuracy).
+        /// </summary>
+        public static (float raHours, float decDegrees) ComputeSunRADec(DateTime utc)
+        {
+            double jd = DateTimeToJulianDate(utc);
+            double n  = jd - 2451545.0;                              // days from J2000.0
+
+            double L = (280.460 + 0.9856474 * n) % 360.0;           // mean longitude (deg)
+            if (L < 0) L += 360.0;
+            double g = (357.528 + 0.9856003 * n) * Math.PI / 180.0; // mean anomaly (rad)
+
+            double lambda = L + 1.915 * Math.Sin(g) + 0.020 * Math.Sin(2.0 * g); // ecliptic lon (deg)
+            double epsilon = (23.439 - 0.0000004 * n) * Math.PI / 180.0;          // obliquity (rad)
+            double lambdaRad = lambda * Math.PI / 180.0;
+
+            double alpha = Math.Atan2(Math.Cos(epsilon) * Math.Sin(lambdaRad), Math.Cos(lambdaRad));
+            double delta = Math.Asin(Math.Sin(epsilon) * Math.Sin(lambdaRad));
+
+            float raHours = (float)(alpha * 12.0 / Math.PI);
+            if (raHours < 0) raHours += 24f;
+            float decDeg  = (float)(delta * 180.0 / Math.PI);
+
+            return (raHours, decDeg);
+        }
+
+        /// <summary>
+        /// Computes the altitude (degrees above horizon) of an object at given RA/Dec
+        /// for an observer at the specified latitude and the given UTC time.
+        /// Returns positive when above horizon, negative when below.
+        /// </summary>
+        public static float ComputeAltitudeDegrees(float raHours, float decDegrees,
+            float latitudeDegrees, float longitudeDegrees, DateTime utc)
+        {
+            float lst = GetLocalSiderealTime(utc, longitudeDegrees); // hours
+            float hourAngle = (lst - raHours) * 15f * Mathf.Deg2Rad; // radians
+            float decRad    = decDegrees   * Mathf.Deg2Rad;
+            float latRad    = latitudeDegrees * Mathf.Deg2Rad;
+
+            float sinAlt = Mathf.Sin(latRad) * Mathf.Sin(decRad)
+                         + Mathf.Cos(latRad) * Mathf.Cos(decRad) * Mathf.Cos(hourAngle);
+            return Mathf.Asin(Mathf.Clamp(sinAlt, -1f, 1f)) * Mathf.Rad2Deg;
         }
 
         /// <summary>

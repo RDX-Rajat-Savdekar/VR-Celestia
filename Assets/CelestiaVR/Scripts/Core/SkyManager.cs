@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using CelestiaVR.Stars;
 using CelestiaVR.Planets;
+using CelestiaVR.Environment;
 
 namespace CelestiaVR.Core
 {
@@ -41,6 +42,8 @@ namespace CelestiaVR.Core
         // Cached sub-systems
         private StarRenderer _starRenderer;
         private PlanetController _planetController;
+        private NamedStarSpawner _namedStarSpawner;
+        private SunController _sunController;
 
         // Time tracking
         private DateTime _simulatedTime;
@@ -58,12 +61,22 @@ namespace CelestiaVR.Core
 
         private void Start()
         {
-            _simulatedTime = useCurrentTime
-                ? DateTime.UtcNow
-                : DateTime.Parse(manualStartTimeUTC, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            try
+            {
+                _simulatedTime = useCurrentTime
+                    ? DateTime.UtcNow
+                    : DateTime.Parse(manualStartTimeUTC, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[SkyManager] Failed to parse manualStartTimeUTC '{manualStartTimeUTC}': {ex.Message}. Using UtcNow.");
+                _simulatedTime = DateTime.UtcNow;
+            }
 
             _starRenderer = GetComponentInChildren<StarRenderer>();
             _planetController = GetComponentInChildren<PlanetController>();
+            _namedStarSpawner = GetComponentInChildren<NamedStarSpawner>();
+            _sunController = GetComponentInChildren<SunController>();
 
             ApplySkyRotation();
 
@@ -72,6 +85,12 @@ namespace CelestiaVR.Core
 
             if (_planetController != null)
                 _planetController.Initialize(this);
+
+            if (_namedStarSpawner != null)
+                _namedStarSpawner.Initialize(this);
+
+            if (_sunController != null)
+                _sunController.Initialize(this);
         }
 
         private void Update()
@@ -80,13 +99,17 @@ namespace CelestiaVR.Core
             if (_accumulatedSeconds >= 1f)
             {
                 int secondsToAdd = Mathf.FloorToInt(_accumulatedSeconds);
-                _simulatedTime = _simulatedTime.AddSeconds(secondsToAdd);
+                try { _simulatedTime = _simulatedTime.AddSeconds(secondsToAdd); }
+                catch { _simulatedTime = DateTime.UtcNow; }
                 _accumulatedSeconds -= secondsToAdd;
 
                 ApplySkyRotation();
 
                 if (_planetController != null)
                     _planetController.UpdatePositions(_simulatedTime);
+
+                if (_sunController != null)
+                    _sunController.UpdateSunPosition(_simulatedTime);
             }
         }
 
@@ -113,6 +136,20 @@ namespace CelestiaVR.Core
 
         public DateTime SimulatedTime => _simulatedTime;
 
+        // ── Sun helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>Returns the Sun's current RA (hours) and Dec (degrees).</summary>
+        public (float raHours, float decDegrees) GetSunEquatorialCoords()
+            => CelestialCoordinates.ComputeSunRADec(_simulatedTime);
+
+        /// <summary>Returns the Sun's altitude above the observer's horizon in degrees.</summary>
+        public float GetSunAltitudeDegrees()
+        {
+            var (ra, dec) = GetSunEquatorialCoords();
+            return CelestialCoordinates.ComputeAltitudeDegrees(ra, dec,
+                observerLatitude, observerLongitude, _simulatedTime);
+        }
+
         /// <summary>
         /// Directly offset the simulated time by a given number of seconds.
         /// Call this from TimeScrollController to drive time-scrubbing.
@@ -120,11 +157,15 @@ namespace CelestiaVR.Core
         /// </summary>
         public void OffsetSimulatedTime(double seconds)
         {
-            _simulatedTime = _simulatedTime.AddSeconds(seconds);
+            if (!double.IsFinite(seconds)) return;
+            try { _simulatedTime = _simulatedTime.AddSeconds(seconds); }
+            catch { _simulatedTime = DateTime.UtcNow; }
             _accumulatedSeconds = 0f; // reset accumulator so Update() doesn't double-advance
             ApplySkyRotation();
             if (_planetController != null)
                 _planetController.UpdatePositions(_simulatedTime);
+            if (_sunController != null)
+                _sunController.UpdateSunPosition(_simulatedTime);
         }
     }
 }

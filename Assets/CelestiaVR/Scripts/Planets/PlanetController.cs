@@ -26,6 +26,9 @@ namespace CelestiaVR.Planets
             [Tooltip("Per-planet scale multiplier on top of planetDisplaySize. Use to correct GLB import size differences.")]
             [Range(0.01f, 5f)]
             public float scaleMultiplier = 1f;
+            [Tooltip("If > 0, overrides the global planetDisplaySize for this body. " +
+                     "Set to ~4.5 for Moon (= 0.5° angular size at sky radius 500).")]
+            public float overrideDisplaySize = 0f;
         }
 
         [Header("Planets")]
@@ -65,9 +68,10 @@ namespace CelestiaVR.Planets
                 go.transform.localScale = Vector3.one; // reset first so bounds are in model units
                 float modelSize = GetMaxBoundsSize(go);
                 float multiplier = Mathf.Max(0.01f, entry.scaleMultiplier); // guard serialized zero
+                float displaySize = entry.overrideDisplaySize > 0f ? entry.overrideDisplaySize : planetDisplaySize;
                 float effectiveScale = modelSize > 0f
-                    ? (planetDisplaySize * multiplier) / modelSize
-                    : planetDisplaySize * multiplier;
+                    ? (displaySize * multiplier) / modelSize
+                    : displaySize * multiplier;
                 go.transform.localScale = Vector3.one * effectiveScale;
                 Debug.Log($"[PlanetController] {entry.planetName}: modelSize={modelSize:F2} → scale={effectiveScale:F4}");
                 Debug.Log($"[PlanetController] Spawned {entry.planetName} (prefab ok, ephemeris file: {(entry.ephemerisFile != null ? entry.ephemerisFile.name : "MISSING")})");

@@ -68,12 +68,15 @@ Thumbs.db
 /Assets/CelestiaVR_resources/Space\ Graphics\ Toolkit\ v4.1/
 /Assets/CelestiaVR_resources/HYG_StarDataBase/hyg_v42.csv
 /Assets/CelestiaVR_resources/PlanetTextures/*.glb
+/Assets/CelestiaVR_resources/Environment/*.glb
+/Assets/CelestiaVR_resources/PlanetTextures.zip
 /Assets/Plugins/
 
 # Keep meta files for the above (so Unity doesn't lose references)
 !/Assets/CelestiaVR_resources/Space\ Graphics\ Toolkit\ v4.1/*.meta
 !/Assets/CelestiaVR_resources/HYG_StarDataBase/*.meta
 !/Assets/CelestiaVR_resources/PlanetTextures/*.meta
+!/Assets/CelestiaVR_resources/Environment/*.meta
 !/Assets/Plugins.meta
 
 # Android build output

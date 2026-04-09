@@ -35,6 +35,7 @@ namespace CelestiaVR.Stars
         private const int COL_DEC = 8;
         private const int COL_DIST = 9;
         private const int COL_MAG = 13;
+        private const int COL_SPECT = 15;
         private const int COL_CI = 16;
 
         private void Start()
@@ -109,11 +110,13 @@ namespace CelestiaVR.Stars
                 int.TryParse(cols[COL_HIP], out int hip);
 
                 string properName = cols.Length > COL_PROPER ? cols[COL_PROPER].Trim().Trim('"') : "";
+                string spect = cols.Length > COL_SPECT ? cols[COL_SPECT].Trim().Trim('"') : "";
 
                 var star = new StarData
                 {
                     hipId = hip,
                     properName = properName,
+                    spectralClass = spect,
                     raHours = ra,
                     decDegrees = dec,
                     magnitude = mag,

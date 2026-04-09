@@ -24,13 +24,26 @@ namespace CelestiaVR.Core
         private void Awake()
         {
             GetComponent<MeshFilter>().mesh = CreateInvertedSphere(radius, longitudeSegments, latitudeSegments);
-            if (skyMaterial != null)
-                GetComponent<MeshRenderer>().material = skyMaterial;
 
-            // Sky sphere should not cast/receive shadows
             var mr = GetComponent<MeshRenderer>();
+
+            if (skyMaterial != null)
+            {
+                mr.material = skyMaterial;
+            }
+            else
+            {
+                // No Milky Way texture assigned yet — render solid black so Unity's
+                // default procedural blue sky doesn't bleed through the sphere.
+                var blackMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")
+                               ?? Shader.Find("Unlit/Color"));
+                blackMat.name  = "SkySphere_Black_Fallback";
+                blackMat.color = Color.black;
+                mr.material    = blackMat;
+            }
+
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows = false;
+            mr.receiveShadows    = false;
         }
 
         private static Mesh CreateInvertedSphere(float r, int lonSegs, int latSegs)

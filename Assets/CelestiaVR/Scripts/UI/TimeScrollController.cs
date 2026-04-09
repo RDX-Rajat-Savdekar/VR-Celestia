@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
 using CelestiaVR.Core;
@@ -5,132 +6,104 @@ using CelestiaVR.Core;
 namespace CelestiaVR.UI
 {
     /// <summary>
-    /// Star Walk 2-style time scrubbing via the right thumbstick.
+    /// Scrolls simulated time automatically and/or via VR thumbstick.
     ///
-    /// - Push thumbstick left/right → time scrolls backward/forward
-    /// - Release thumbstick → momentum carries time forward and decelerates (inertia)
-    /// - Hold grip on either controller while scrolling → 10x speed multiplier
-    ///
-    /// Attach anywhere in the scene (e.g., [SkyManager] or [XR Origin]).
-    /// Requires SkyManager.Instance to be present.
+    /// In the editor / without a headset: time auto-scrolls at autoScrollHoursPerSecond.
+    /// On Quest: right thumbstick X scrubs time; grip = 24x multiplier.
     /// </summary>
     public class TimeScrollController : MonoBehaviour
     {
-        [Header("Time Speed")]
-        [Tooltip("How many in-game hours advance per second when thumbstick is fully pushed.")]
-        public float hoursPerSecondAtFullTilt = 1f;
+        [Header("Auto-Scroll (testing)")]
+        [Tooltip("Hours of in-game time per real second when no thumbstick input.")]
+        public float autoScrollHoursPerSecond = 2f;
 
-        [Tooltip("Multiplier applied when the grip button is held — for jumping days quickly.")]
+        [Header("VR Thumbstick")]
+        [Tooltip("Hours per second at full thumbstick deflection.")]
+        public float hoursPerSecondAtFullTilt = 1f;
+        [Tooltip("Speed multiplier while grip is held.")]
         public float gripSpeedMultiplier = 24f;
 
         [Header("Inertia")]
-        [Tooltip("How quickly momentum decays after releasing the thumbstick. Higher = snappier stop.")]
         [Range(0.5f, 20f)]
         public float inertiaDamping = 4f;
-
-        [Tooltip("Minimum momentum (hours/sec) below which motion fully stops.")]
         public float momentumDeadzone = 0.001f;
 
-        [Header("Input Dead Zone")]
         [Range(0f, 0.5f)]
         public float thumbstickDeadzone = 0.15f;
 
-        // Current momentum in hours per second (signed: positive = forward, negative = backward)
         private float _momentumHoursPerSec = 0f;
-
-        // XR device references — fetched once and cached
-        private InputDevice _rightController;
-        private InputDevice _leftController;
-        private bool _devicesFound = false;
+        private List<InputDevice> _rightHand = new List<InputDevice>();
+        private List<InputDevice> _leftHand  = new List<InputDevice>();
 
         private void Start()
         {
-            TryFindDevices();
-        }
-
-        private void TryFindDevices()
-        {
-            var rightHand = new System.Collections.Generic.List<InputDevice>();
-            var leftHand  = new System.Collections.Generic.List<InputDevice>();
-
-            InputDevices.GetDevicesWithCharacteristics(
-                InputDeviceCharacteristics.Right | InputDeviceCharacteristics.Controller, rightHand);
-            InputDevices.GetDevicesWithCharacteristics(
-                InputDeviceCharacteristics.Left  | InputDeviceCharacteristics.Controller, leftHand);
-
-            if (rightHand.Count > 0) _rightController = rightHand[0];
-            if (leftHand.Count  > 0) _leftController  = leftHand[0];
-
-            _devicesFound = _rightController.isValid || _leftController.isValid;
+            _momentumHoursPerSec = autoScrollHoursPerSecond;
+            RefreshDevices();
         }
 
         private void Update()
         {
             if (SkyManager.Instance == null) return;
 
-            // Retry device discovery if controllers haven't been found yet
-            if (!_devicesFound) TryFindDevices();
+            RefreshDevicesIfNeeded();
 
             float thumbstickX = GetThumbstickX();
-            bool gripHeld = GetGripHeld();
-
-            float speedMultiplier = gripHeld ? gripSpeedMultiplier : 1f;
+            bool  gripHeld    = GetGripHeld();
 
             if (Mathf.Abs(thumbstickX) > thumbstickDeadzone)
             {
-                // Thumbstick is active — drive momentum directly from input
-                float targetMomentum = thumbstickX * hoursPerSecondAtFullTilt * speedMultiplier;
-                // Smooth the ramp-up so it doesn't feel instant
-                _momentumHoursPerSec = Mathf.Lerp(_momentumHoursPerSec, targetMomentum, Time.deltaTime * 10f);
+                float target = thumbstickX * hoursPerSecondAtFullTilt * (gripHeld ? gripSpeedMultiplier : 1f);
+                _momentumHoursPerSec = Mathf.Lerp(_momentumHoursPerSec, target, Time.deltaTime * 10f);
             }
             else
             {
-                // Thumbstick released — apply inertia decay
-                _momentumHoursPerSec = Mathf.Lerp(_momentumHoursPerSec, 0f, Time.deltaTime * inertiaDamping);
-                if (Mathf.Abs(_momentumHoursPerSec) < momentumDeadzone)
-                    _momentumHoursPerSec = 0f;
+                // No thumbstick — hold at auto-scroll rate (no decay)
+                _momentumHoursPerSec = autoScrollHoursPerSecond;
             }
 
             if (_momentumHoursPerSec != 0f)
-            {
-                double secondsToAdd = _momentumHoursPerSec * 3600.0 * Time.deltaTime;
-                SkyManager.Instance.OffsetSimulatedTime(secondsToAdd);
-            }
+                SkyManager.Instance.OffsetSimulatedTime(_momentumHoursPerSec * 3600.0 * Time.deltaTime);
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────────
+
+        private bool _devicesValid = false;
+
+        private void RefreshDevices()
+        {
+            _rightHand.Clear();
+            _leftHand.Clear();
+            InputDevices.GetDevicesWithCharacteristics(
+                InputDeviceCharacteristics.Right | InputDeviceCharacteristics.Controller, _rightHand);
+            InputDevices.GetDevicesWithCharacteristics(
+                InputDeviceCharacteristics.Left  | InputDeviceCharacteristics.Controller, _leftHand);
+            _devicesValid = _rightHand.Count > 0 || _leftHand.Count > 0;
+        }
+
+        private void RefreshDevicesIfNeeded()
+        {
+            if (!_devicesValid) RefreshDevices();
         }
 
         private float GetThumbstickX()
         {
-            // Try right controller first, fall back to left
-            if (_rightController.isValid)
-            {
-                if (_rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 axis))
-                    return axis.x;
-            }
-            if (_leftController.isValid)
-            {
-                if (_leftController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 axis))
-                    return axis.x;
-            }
+            foreach (var d in _rightHand)
+                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.x;
+            foreach (var d in _leftHand)
+                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.x;
             return 0f;
         }
 
         private bool GetGripHeld()
         {
-            bool grip = false;
-            if (_rightController.isValid)
-                _rightController.TryGetFeatureValue(CommonUsages.gripButton, out grip);
-            if (!grip && _leftController.isValid)
-                _leftController.TryGetFeatureValue(CommonUsages.gripButton, out grip);
-            return grip;
+            foreach (var d in _rightHand)
+                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool v) && v) return true;
+            foreach (var d in _leftHand)
+                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool v) && v) return true;
+            return false;
         }
 
-        /// <summary>
-        /// Public API — lets a UI button auto-scroll time (e.g. play/pause button).
-        /// Set to 0 to stop.
-        /// </summary>
-        public void SetAutoScrollSpeed(float hoursPerSec)
-        {
-            _momentumHoursPerSec = hoursPerSec;
-        }
+        /// <summary>Set to 0 to pause, non-zero to resume from UI buttons.</summary>
+        public void SetAutoScrollSpeed(float hoursPerSec) => autoScrollHoursPerSecond = hoursPerSec;
     }
 }

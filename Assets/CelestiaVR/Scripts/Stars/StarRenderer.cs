@@ -41,6 +41,18 @@ namespace CelestiaVR.Stars
         [Range(0.5f, 5f)]
         public float twinkleSpeed = 2f;
 
+        [Header("Named Stars")]
+        [Tooltip("Named stars brighter than this magnitude will be spawned as sphere objects by NamedStarSpawner — skip them here to avoid double-rendering.")]
+        [Range(0f, 6f)]
+        public float namedStarSphereThreshold = 3.0f;
+        public bool skipNamedStarsInBillboards = true;
+
+        /// <summary>
+        /// Day/night fade multiplier (0 = all stars invisible, 1 = full night sky).
+        /// Set each frame by DayNightController.
+        /// </summary>
+        public float GlobalBrightnessFade { get; set; } = 1f;
+
         // GPU instancing batches (DrawMeshInstanced max 1023 per call)
         private const int BatchSize = 1023;
         private Matrix4x4[][] _matrices;
@@ -160,10 +172,19 @@ namespace CelestiaVR.Stars
                 var colors = new Vector4[count];
                 var brightnesses = new float[count];
 
+                int skipped = 0;
                 for (int i = 0; i < count; i++)
                 {
                     var star = _stars[start + i];
-                    float size = baseSize + star.brightness * sizeByBrightness;
+
+                    // Named bright stars are rendered as sphere objects — leave a zero-scale
+                    // placeholder so batch indices stay stable, but make it invisible.
+                    bool isNamedSphere = skipNamedStarsInBillboards
+                        && !string.IsNullOrEmpty(star.properName)
+                        && star.magnitude < namedStarSphereThreshold;
+                    if (isNamedSphere) { skipped++; }
+
+                    float size = isNamedSphere ? 0f : baseSize + star.brightness * sizeByBrightness;
                     Vector3 pos = star.unitPosition * _skyManager.skyRadius;
                     Quaternion rot = Quaternion.LookRotation(-pos.normalized);
                     _matrices[b][i]         = Matrix4x4.TRS(pos, rot, Vector3.one * size);
@@ -176,6 +197,8 @@ namespace CelestiaVR.Stars
                 block.SetVectorArray(ColorProp, colors);
                 block.SetFloatArray(BrightnessProp, brightnesses);
                 _propertyBlocks[b] = block;
+                if (skipped > 0)
+                    Debug.Log($"[StarRenderer] Batch {b}: skipped {skipped} named-star billboard(s) (will be sphere objects).");
             }
         }
 
@@ -208,7 +231,7 @@ namespace CelestiaVR.Stars
                     for (int i = 0; i < count; i++)
                     {
                         float twinkle = 1f + Mathf.Sin(t + _twinklePhases[b][i]) * twinkleAmount;
-                        animBrightness[i] = _baseBrightnesses[b][i] * twinkle * brightnessMultiplier;
+                        animBrightness[i] = _baseBrightnesses[b][i] * twinkle * brightnessMultiplier * GlobalBrightnessFade;
                     }
                     _propertyBlocks[b].SetFloatArray(BrightnessProp, animBrightness);
                 }

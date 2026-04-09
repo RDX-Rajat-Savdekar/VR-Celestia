@@ -794,6 +794,8 @@ GameObject:
   - component: {fileID: 537333887}
   - component: {fileID: 537333889}
   - component: {fileID: 537333888}
+  - component: {fileID: 537333890}
+  - component: {fileID: 537333891}
   m_Layer: 0
   m_Name: StarField
   m_TagString: Untagged
@@ -834,6 +836,8 @@ MonoBehaviour:
   brightnessMultiplier: 2
   twinkleAmount: 0.35
   twinkleSpeed: 2
+  namedStarSphereThreshold: 3
+  skipNamedStarsInBillboards: 1
 --- !u!114 &537333889
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -849,6 +853,40 @@ MonoBehaviour:
   catalogTextAsset: {fileID: 4900000, guid: 464ad8df5e0f94350a101adf318dcd7d, type: 3}
   magnitudeLimit: 6.5
   maxStars: 0
+--- !u!114 &537333890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 537333886}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30d0d87a618b94172bf8a3c10ca42433, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Stars.NamedStarSpawner
+  magnitudeThreshold: 3
+  minSphereRadius: 0.8
+  maxSphereRadius: 2.2
+  glowRadiusMultiplier: 3
+--- !u!114 &537333891
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 537333886}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38c35487e21024c2388d33cd525b404d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Stars.DeepSkyObjectSpawner
+  billboardMaterial: {fileID: 2100000, guid: e632a9ccc74b14547bbf874f271ee63e, type: 2}
+  images:
+  - {fileID: 2800000, guid: d6008a35f0c3b4a399f884b983e3a4d3, type: 3}
+  - {fileID: 2800000, guid: addc76bf81f5e407c9dedcc64b363022, type: 3}
+  - {fileID: 2800000, guid: 5b5b26f6b8c42482e8993449f856aa68, type: 3}
+  - {fileID: 2800000, guid: 881e4f843eb6744a7b0fc942d81be7fb, type: 3}
 --- !u!1 &550919777
 GameObject:
   m_ObjectHideFlags: 0
@@ -1313,7 +1351,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &793918438
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1465,7 +1503,7 @@ Transform:
   m_GameObject: {fileID: 864005241}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.65632, y: 2.12861, z: 1.76361}
+  m_LocalPosition: {x: -5.32, y: 2.12861, z: 1.76361}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1562,7 +1600,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1120337022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2587,48 +2625,56 @@ MonoBehaviour:
       to 430\xB0C"
     apparentMagnitude: -0.5
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   - planetName: Venus
     prefab: {fileID: 5076879274432134403, guid: 3594591daac614f8287ddec545c7482c, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 2168c530fa67b4a94985913e5ffde439, type: 3}
     description: 
     apparentMagnitude: -4
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   - planetName: Moon
     prefab: {fileID: 796142845331047480, guid: 2ff8b89b711e6484b935c0a9492df67f, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 2ae3fc2ea4f334cb38e670d10468554f, type: 3}
     description: 
     apparentMagnitude: 0
     scaleMultiplier: 1
+    overrideDisplaySize: 4.5
   - planetName: Jupiter
     prefab: {fileID: 7524579942725688795, guid: 8d4a6b273b5074b3c82940ea81ee3651, type: 3}
     ephemerisFile: {fileID: 4900000, guid: ffc7e2bcc851c47d79eda46ca5a119d4, type: 3}
     description: 
     apparentMagnitude: -2.5
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   - planetName: Mars
     prefab: {fileID: 6889099290102195368, guid: e57f09d0f514f4e229bb78d45b2e76b7, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 9d852acd0b7954e08b574ae5e5816c6b, type: 3}
     description: 
     apparentMagnitude: 0.5
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   - planetName: Saturn
     prefab: {fileID: 4823143146726876910, guid: 36d9f229a68bc45329c5c4944325ae3e, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 7491a8a844ab443408722a964dcef40c, type: 3}
     description: 
     apparentMagnitude: 0.001
     scaleMultiplier: 0.01
+    overrideDisplaySize: 0
   - planetName: Uranus
     prefab: {fileID: 7339641103837570230, guid: 4f8af1d3b49544183b7d80c4527821c8, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 7efd3a358b3bd4634b7f3a21da6e7ee0, type: 3}
     description: 
     apparentMagnitude: 0
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   - planetName: Neptune
     prefab: {fileID: 2301614696674140981, guid: a3e1e5fb328944060ab83c0b985b140b, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 3b8bd73f17afc437babed4b0a4135c82, type: 3}
     description: 
     apparentMagnitude: 0
     scaleMultiplier: 1
+    overrideDisplaySize: 0
   planetDisplaySize: 2
 --- !u!1 &1783572213
 GameObject:
@@ -2720,6 +2766,59 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9b4a657c7df58fb4fa21624fe730efa2, type: 3}
+--- !u!1 &1872271624
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1872271625}
+  - component: {fileID: 1872271626}
+  m_Layer: 0
+  m_Name: Sun
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1872271625
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872271624}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2016144800}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1872271626
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872271624}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb1d67b5f0bfe4114a95e42872d3a254, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.SunController
+  sunRadius: 2.5
+  glowMultiplier: 4
+  sunLight: {fileID: 0}
+  maxLightIntensity: 1.2
+  showSolarArc: 1
+  arcHalfSpanHours: 12
+  arcSamples: 48
+  arcWidth: 0.15
+  arcColor: {r: 1, g: 0.85, b: 0.3, a: 0.55}
 --- !u!1 &1973346652
 GameObject:
   m_ObjectHideFlags: 0
@@ -2997,6 +3096,8 @@ GameObject:
   - component: {fileID: 2016144799}
   - component: {fileID: 2016144801}
   - component: {fileID: 2016144802}
+  - component: {fileID: 2016144803}
+  - component: {fileID: 2016144804}
   m_Layer: 0
   m_Name: SkyManager
   m_TagString: Untagged
@@ -3039,6 +3140,7 @@ Transform:
   - {fileID: 537333887}
   - {fileID: 630639571}
   - {fileID: 1586559862}
+  - {fileID: 1872271625}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2016144801
@@ -3067,6 +3169,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Interaction.GazeDebugger
   cursorSize: 3
   logInterval: 2
+--- !u!114 &2016144803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2016144798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0367eed0bde5f403f9d5245d7baa4d47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.UI.TimeScrollController
+  autoScrollHoursPerSecond: 2
+  hoursPerSecondAtFullTilt: 1
+  gripSpeedMultiplier: 24
+  inertiaDamping: 4
+  momentumDeadzone: 0.001
+  thumbstickDeadzone: 0.15
+--- !u!114 &2016144804
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2016144798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16895ebba8861452f997c75bdc0c0522, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.IslandLightingFixer
+  islandRoot: {fileID: 1428880190118617247}
+  smoothness: 0.25
 --- !u!1 &2136151788
 GameObject:
   m_ObjectHideFlags: 0
@@ -3187,8 +3321,33 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1428880190118617248}
   m_SourcePrefab: {fileID: 100100000, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+--- !u!1 &1428880190118617247 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+  m_PrefabInstance: {fileID: 1428880190118617246}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1428880190118617248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1428880190118617247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5955d9c8ca33e441cb0aea65d741921c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.DayNightController
+  nightAmbient: {r: 0.03, g: 0.04, b: 0.08, a: 1}
+  dayAmbient: {r: 0.55, g: 0.65, b: 0.75, a: 1}
+  useDaySkyDome: 0
+  daySkyColor: {r: 0.13550197, g: 0.21337667, b: 0.3301887, a: 0}
+  twilightSpanDegrees: 18
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

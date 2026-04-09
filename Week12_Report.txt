@@ -1,0 +1,149 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+
+\title{\textbf{CelestiaVR -- Week 12 Progress Report}\\
+\large Deliverable \#3 $|$ Interaction Loop\\
+\normalsize Due: April 8, 2026}
+\author{Rajat Savdekar}
+\date{}
+
+\begin{document}
+\maketitle
+
+% ─────────────────────────────────────────────
+\section{Project Overview}
+CelestiaVR is a Meta Quest 3 VR stargazing application that places the user on a
+tropical island at night and allows them to explore the sky --- stars, planets,
+constellations, deep-sky objects, and the Milky Way --- using gaze and controller
+interactions inspired by Star Walk 2.
+
+% ─────────────────────────────────────────────
+\section{Week 12 Progress}
+
+\subsection{Topic Reconsideration}
+Midway through this sprint the team briefly reconsidered pivoting to a
+\textit{Rage Room} VR concept due to concerns about the technical scope of
+CelestiaVR. After consulting with the professor, we concluded that while
+CelestiaVR is ambitious, it is the stronger and more original project.
+We committed to continuing with CelestiaVR for the remainder of the course.
+
+\subsection{What Was Implemented This Week}
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Island Environment} --- Replaced the placeholder floor with a
+    fully textured tropical island (GLTF/GLB model) including mesh collider for
+    VR locomotion.
+
+    \item \textbf{Milky Way Skybox} --- Integrated an ESO equirectangular
+    panoramic image (\textit{eso0932a}) as a Unity \texttt{Skybox/Panoramic}
+    material. The skybox rotation is driven by the SkyManager's sidereal time
+    calculation so the Milky Way band moves accurately with time of day.
+
+    \item \textbf{Planet Gaze \& Dwell Inspection} --- Implemented a full dwell
+    selection pipeline: the user gazes at a planet for 3 seconds, triggering a
+    hologram pull-out animation that brings the planet to a comfortable viewing
+    distance. The hologram rotates in place while an information panel fades in.
+
+    \item \textbf{Hologram Dismissal} --- Added a dismiss interaction (controller
+    Activate button) to send the hologram away and return to the sky view.
+
+    \item \textbf{Time Scroll Controller} --- Built a Star Walk 2-style time
+    scrubbing system driven by the right thumbstick. Horizontal input advances or
+    rewinds simulated time; releasing the thumbstick applies inertia/momentum.
+    Holding the grip button applies a 24$\times$ speed multiplier for jumping
+    days or weeks. All sky elements (stars, constellations, planets, Milky Way)
+    update in real time with the scrubbed time.
+
+    \item \textbf{Deep Sky Objects} --- Andromeda (M31), Orion Nebula (M42),
+    Pleiades (M45), and Hercules Cluster (M13) are rendered as billboard sprites
+    positioned at their correct RA/Dec coordinates, rotating with the sky.
+\end{itemize}
+
+\subsection{What Was Temporarily Removed}
+The \textbf{telescope interaction} and several secondary controller interactions
+were disabled this week. These features were introduced in the Week 11 build but
+caused stability issues and conflicted with the new dwell/inspection pipeline.
+Rather than ship broken interactions, we chose to cleanly remove them and
+re-implement them properly in Week 13.
+
+% ─────────────────────────────────────────────
+\section{Demo Video}
+A 1--2 minute screen-capture video accompanies this submission. It demonstrates:
+\begin{enumerate}[noitemsep]
+    \item The tropical island night environment with the Milky Way visible in the
+    skybox.
+    \item The user gazing at a planet, triggering the 3-second dwell timer, and
+    the hologram materialising in front of them.
+    \item The information panel appearing with planet details.
+    \item The dismiss interaction sending the hologram away.
+    \item The time scroll feature rotating the sky in real time.
+\end{enumerate}
+
+% ─────────────────────────────────────────────
+\section{Usability \& Evaluation Plan}
+
+\subsection{Goals}
+The primary usability goal is to verify that a first-time VR user can:
+(1) understand how to select a celestial object without any tutorial,
+(2) read and absorb information from the inspection panel, and
+(3) successfully dismiss the hologram and continue exploring.
+
+\subsection{Participants}
+We plan to recruit 4--6 participants from the class with no prior experience
+with CelestiaVR. At least two participants should have minimal VR experience
+to capture first-time-user behaviour.
+
+\subsection{Tasks}
+Each participant will be asked to complete the following tasks without
+assistance:
+\begin{enumerate}[noitemsep]
+    \item \textit{Find and inspect a planet} --- identify any planet in the sky
+    and trigger the dwell inspection.
+    \item \textit{Read the panel} --- state aloud one fact shown on the
+    information panel.
+    \item \textit{Dismiss the hologram} --- return the hologram to the sky.
+    \item \textit{Scroll time forward} --- use the thumbstick to advance the sky
+    by several hours and observe the change.
+\end{enumerate}
+
+\subsection{Metrics}
+\begin{itemize}[noitemsep]
+    \item \textbf{Task completion rate} --- \% of participants who complete each
+    task unassisted.
+    \item \textbf{Time on task} --- seconds taken to trigger first successful
+    dwell selection.
+    \item \textbf{Error count} --- number of accidental dismissals or failed
+    dwell attempts.
+    \item \textbf{Comfort rating} --- 1--5 Likert scale for motion comfort and
+    visual clarity.
+    \item \textbf{Qualitative feedback} --- short post-session interview (3--5
+    minutes) asking what felt intuitive and what was confusing.
+\end{itemize}
+
+\subsection{Success Criteria}
+We consider the interaction loop successful if:
+\begin{itemize}[noitemsep]
+    \item $\geq$80\% of participants complete Tasks 1--3 without assistance.
+    \item Average time to first dwell selection is under 60 seconds.
+    \item No participant reports motion sickness above a 2/5 rating.
+\end{itemize}
+
+\subsection{Timeline}
+Playtesting is scheduled for Week 13. Findings will inform refinements to dwell
+timer duration, panel layout, and the re-introduction of the telescope
+interaction.
+
+% ─────────────────────────────────────────────
+\section{Next Steps (Week 13)}
+\begin{itemize}[noitemsep]
+    \item Re-implement and stabilise the telescope interaction.
+    \item Add audio feedback (ambient night sounds, selection chimes).
+    \item Conduct playtesting sessions per the evaluation plan above.
+    \item Add constellation tap-to-label interaction.
+\end{itemize}
+
+\end{document}

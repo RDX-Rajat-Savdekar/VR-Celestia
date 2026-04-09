@@ -1,31 +1,84 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 using CelestiaVR.Interaction;
 
 namespace CelestiaVR.Core
 {
     /// <summary>
-    /// Quick-start helper — wires up system references in Play mode when
-    /// you haven't yet configured everything in the Inspector.
+    /// Quick-start helper — wires up system references in Play mode and enforces
+    /// the correct render settings for a night-sky VR scene.
     ///
     /// Attach to any persistent root GameObject in StargazingScene.
-    /// This is optional — proper inspector wiring is preferred for production.
     /// </summary>
     public class StargazingSceneBootstrap : MonoBehaviour
     {
         private void Start()
         {
-            // Auto-find camera if not set on DwellSelector
+            FixRenderSettings();
+            DisableSceneLights();
+            FixCamera();
+            WireInteraction();
+
+            Debug.Log("[StargazingSceneBootstrap] Scene wired up.");
+        }
+
+        /// <summary>
+        /// Fog at density 0.05 (ExponentialSquared) completely covers the sky sphere
+        /// at radius 500. Ambient in Skybox mode with no skybox defaults to a bright
+        /// grey — both must be corrected before the scene looks right.
+        /// </summary>
+        private void FixRenderSettings()
+        {
+            // Fog buries the SkySphere. Turn it off — space has no fog.
+            RenderSettings.fog = false;
+
+            // Switch ambient to Flat so DayNightController can drive it via
+            // RenderSettings.ambientLight. In Skybox mode that setter is ignored.
+            RenderSettings.ambientMode  = AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.03f, 0.04f, 0.08f); // near-black night
+
+            // No skybox material — Unity falls back to a grey procedural sky background.
+            // Camera is already set to SolidColor/black, so just ensure no skybox leaks.
+            RenderSettings.skybox = null;
+        }
+
+        /// <summary>
+        /// The scene has two baked directional lights (both intensity 1) left over from
+        /// the VR template. SunController creates and manages its own directional light,
+        /// so disable all pre-existing ones to avoid double-illumination.
+        /// </summary>
+        private void DisableSceneLights()
+        {
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (l.type != LightType.Directional) continue;
+                // "SunDirectionalLight" is created by SunController — leave it alone.
+                if (l.name == "SunDirectionalLight") continue;
+                l.enabled = false;
+                Debug.Log($"[StargazingSceneBootstrap] Disabled pre-existing directional light: {l.name}");
+            }
+        }
+
+        /// <summary>Camera must clear to solid black so the SkySphere isn't contaminated
+        /// by any Unity default sky colour.</summary>
+        private void FixCamera()
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            cam.clearFlags       = CameraClearFlags.SolidColor;
+            cam.backgroundColor  = Color.black;
+        }
+
+        private void WireInteraction()
+        {
             var dwell = FindFirstObjectByType<DwellSelector>();
             if (dwell != null && dwell.gazeCamera == null)
                 dwell.gazeCamera = Camera.main;
 
-            // Auto-find SelectionManager → InspectionController link
-            var selMgr = FindFirstObjectByType<SelectionManager>();
+            var selMgr    = FindFirstObjectByType<SelectionManager>();
             var inspector = FindFirstObjectByType<InspectionController>();
             if (selMgr != null && inspector != null && inspector.selectionManager == null)
                 inspector.selectionManager = selMgr;
-
-            Debug.Log("[StargazingSceneBootstrap] Scene wired up.");
         }
     }
 }

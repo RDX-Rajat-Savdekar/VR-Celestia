@@ -113,13 +113,21 @@ namespace CelestiaVR.Interaction
         {
             if (_hologramCopy == null) return;
 
-            // Spin the hologram
-            _hologramCopy.transform.Rotate(Vector3.up, hologramSpinSpeed * Time.deltaTime, Space.Self);
-
             // Smoothly follow the camera so it stays in front of the user
             Vector3 target = GetInspectionWorldPosition();
             _hologramCopy.transform.position = Vector3.Lerp(
                 _hologramCopy.transform.position, target, Time.deltaTime * 3f);
+
+            if (_inspectedBody != null && _inspectedBody.bodyType == CelestialBodyType.DeepSkyObject)
+            {
+                // Keep image facing the camera — spinning a flat quad just shows the edge
+                _hologramCopy.transform.rotation = Quaternion.LookRotation(
+                    _hologramCopy.transform.position - _xrCamera.transform.position);
+            }
+            else
+            {
+                _hologramCopy.transform.Rotate(Vector3.up, hologramSpinSpeed * Time.deltaTime, Space.Self);
+            }
         }
 
         private IEnumerator AnimateIn(CelestialBody body)
@@ -134,9 +142,11 @@ namespace CelestiaVR.Interaction
             foreach (var col in _hologramCopy.GetComponentsInChildren<Collider>())
                 Destroy(col);
 
-            // Target scale: preserve the planet's normalized root scale, multiply by inspectionSize.
-            // This ensures km-scale GLBs (Saturn) appear the same hologram size as other planets.
-            Vector3 finalScale = body.transform.localScale * inspectionSize;
+            // DSOs are flat quads — use a fixed comfortable viewing size instead of
+            // scaling down from their large sky size (which produces inconsistent results).
+            Vector3 finalScale = body.bodyType == CelestialBodyType.DeepSkyObject
+                ? Vector3.one * 0.6f
+                : body.transform.localScale * inspectionSize;
 
             Vector3 spawnPos = GetInspectionWorldPosition();
             _hologramCopy.transform.position = spawnPos;
