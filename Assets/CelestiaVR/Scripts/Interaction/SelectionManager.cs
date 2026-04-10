@@ -60,6 +60,14 @@ namespace CelestiaVR.Interaction
 
         private void HandleDwellSelect(CelestialBody body)
         {
+            // In Observe mode the user is just looking around — dwell triggers nothing.
+            var modeMgr = ViewingModeManager.Instance;
+            if (modeMgr != null && !modeMgr.IsInspectMode)
+            {
+                Debug.Log($"[SelectionManager] Dwell on '{body.objectName}' ignored — Observe mode.");
+                return;
+            }
+
             Debug.Log($"[SelectionManager] Dwell-selected: {body.objectName} → triggering inspection.");
             if (_selectedBody != null && _selectedBody.isInspecting)
             {

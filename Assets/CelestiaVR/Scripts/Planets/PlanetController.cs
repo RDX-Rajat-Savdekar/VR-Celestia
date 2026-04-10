@@ -29,6 +29,10 @@ namespace CelestiaVR.Planets
             [Tooltip("If > 0, overrides the global planetDisplaySize for this body. " +
                      "Set to ~4.5 for Moon (= 0.5° angular size at sky radius 500).")]
             public float overrideDisplaySize = 0f;
+            [Tooltip("Physical equatorial radius in km. Used for real-scale mode. Leave 0 to use built-in table.")]
+            public float physicalRadiusKm = 0f;
+            [Tooltip("Temperature in Kelvin (shown in info panel).")]
+            public float temperatureK = 0f;
         }
 
         [Header("Planets")]
@@ -85,6 +89,14 @@ namespace CelestiaVR.Planets
                 body.description = entry.description;
                 body.magnitude = entry.apparentMagnitude;
 
+                // Physical data — use inspector value if set, else built-in table
+                body.physicalRadiusKm = entry.physicalRadiusKm > 0f
+                    ? entry.physicalRadiusKm
+                    : GetBuiltInRadiusKm(entry.planetName);
+                body.temperatureK = entry.temperatureK > 0f
+                    ? entry.temperatureK
+                    : GetBuiltInTemperatureK(entry.planetName);
+
                 // Always add a root SphereCollider for reliable gaze raycasting.
                 // Child mesh colliders on complex prefabs are unreliable for sky-distance gaze.
                 // Remove any existing root collider first to avoid duplicates.
@@ -140,6 +152,37 @@ namespace CelestiaVR.Planets
             Debug.Log($"[PlanetController] {go.name} smallest mesh size = {smallestSize:F2}");
             return smallestSize;
         }
+
+        // ── Built-in physical data ────────────────────────────────────────────────
+
+        private static float GetBuiltInRadiusKm(string name) => name.ToLowerInvariant() switch
+        {
+            "mercury" =>  2_439.7f,
+            "venus"   =>  6_051.8f,
+            "earth"   =>  6_371.0f,
+            "moon"    =>  1_737.4f,
+            "mars"    =>  3_389.5f,
+            "jupiter" => 71_492.0f,
+            "saturn"  => 60_268.0f,
+            "uranus"  => 25_362.0f,
+            "neptune" => 24_622.0f,
+            "pluto"   =>  1_188.3f,
+            _         =>  0f
+        };
+
+        private static float GetBuiltInTemperatureK(string name) => name.ToLowerInvariant() switch
+        {
+            "mercury" =>   440f,
+            "venus"   =>   737f,
+            "earth"   =>   288f,
+            "moon"    =>   220f,
+            "mars"    =>   210f,
+            "jupiter" =>   165f,
+            "saturn"  =>   134f,
+            "uranus"  =>    76f,
+            "neptune" =>    72f,
+            _         =>     0f
+        };
 
         private bool _firstUpdateLogged = false;
 

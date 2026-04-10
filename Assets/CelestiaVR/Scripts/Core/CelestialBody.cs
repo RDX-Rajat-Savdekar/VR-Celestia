@@ -27,6 +27,10 @@ namespace CelestiaVR.Core
         public float distanceLightYears = 0f;
         public float colorIndex = 0f;     // B-V index for stars
         public string spectralType;
+        [Tooltip("Physical radius in km. Set for Sun/Moon/planets. 0 = unknown. Used by real-scale mode.")]
+        public float physicalRadiusKm = 0f;
+        [Tooltip("Surface temperature in Kelvin. Estimated from B-V for stars.")]
+        public float temperatureK = 0f;
 
         [Header("Positional Data")]
         public float rightAscensionHours;

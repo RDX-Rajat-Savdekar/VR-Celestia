@@ -42,6 +42,20 @@ namespace CelestiaVR.Interaction
         private CelestialBody _currentTarget;
         private float _dwellAccumulator;
 
+        // ── Software injection (for billboard stars without colliders) ─────────────
+        private CelestialBody _softwareTarget;
+        private bool _softwareInjectedThisFrame;
+
+        /// <summary>
+        /// Called by BillboardStarDwellDetector each frame when a billboard star is
+        /// within gaze tolerance. If no physics target is found, this becomes the active target.
+        /// </summary>
+        public void InjectSoftwareTarget(CelestialBody body)
+        {
+            _softwareTarget = body;
+            _softwareInjectedThisFrame = true;
+        }
+
         private void Awake()
         {
             if (gazeCamera == null)
@@ -63,6 +77,11 @@ namespace CelestiaVR.Interaction
             // SphereCast gives generous tolerance at sky distances (15-unit radius = ~1.7° at 500u)
             if (Physics.SphereCast(ray, gazeTolerance, out RaycastHit hitInfo, maxDistance, celestialLayers))
                 hit = hitInfo.collider.GetComponentInParent<CelestialBody>();
+
+            // If physics found nothing, accept a software-injected target (billboard stars)
+            if (hit == null && _softwareInjectedThisFrame)
+                hit = _softwareTarget;
+            _softwareInjectedThisFrame = false;
 
             if (hit != _currentTarget)
             {

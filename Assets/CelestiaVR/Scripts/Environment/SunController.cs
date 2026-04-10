@@ -147,12 +147,17 @@ namespace CelestiaVR.Environment
 
             // CelestialBody for selection.
             var body = _sunObject.AddComponent<CelestialBody>();
-            body.objectName  = "Sun";
-            body.bodyType    = CelestialBodyType.Star;
-            body.magnitude   = -26.74f;
-            body.description = "Our star, a G2V yellow dwarf. "
-                             + "Surface temperature ~5,778 K, ~93 million miles away. "
-                             + "The source of all light and life on Earth.";
+            body.objectName        = "Sun";
+            body.bodyType          = CelestialBodyType.Star;
+            body.magnitude         = -26.74f;
+            body.physicalRadiusKm  = 695_700f;
+            body.temperatureK      = 5_778f;
+            body.spectralType      = "G2V";
+            body.distanceLightYears = 0.0000158f; // 8.3 light-minutes
+            body.description       = "Our star, a G2V yellow dwarf. "
+                                   + "Surface temperature ~5,778 K, 696,000 km radius — "
+                                   + "109 times wider than Earth. "
+                                   + "The source of all light and life on Earth.";
 
             // Generous collider for gaze selection.
             var col = _sunObject.AddComponent<SphereCollider>();

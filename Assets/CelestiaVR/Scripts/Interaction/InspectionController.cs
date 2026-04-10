@@ -6,9 +6,13 @@ using CelestiaVR.UI;
 namespace CelestiaVR.Interaction
 {
     /// <summary>
-    /// Handles the pull-out animation and inspection mode.
-    /// When a CelestialBody is selected, it animates from the sky to a comfortable
-    /// viewing position in front of the camera, then shows the inspection UI panel.
+    /// Handles the pull-out animation, inspection mode, and real-scale toggle.
+    ///
+    /// When a CelestialBody is selected, it:
+    ///  1. Spawns a hologram copy in front of the camera.
+    ///  2. Shows the InspectionPanel (auto-created if not assigned).
+    ///  3. Optionally rescales the hologram to the object's true physical size
+    ///     relative to Earth when the user presses the Real Scale button.
     ///
     /// Attach to a dedicated InspectionController GameObject.
     /// </summary>
@@ -19,16 +23,15 @@ namespace CelestiaVR.Interaction
         public SelectionManager selectionManager;
 
         [Header("Inspection Position")]
-        [Tooltip("Distance in front of the camera (meters).")]
+        [Tooltip("Distance in front of the camera (metres).")]
         [Range(0.3f, 3f)]
         public float inspectionDistance = 1.5f;
         [Tooltip("Horizontal offset (positive = right).")]
         public float horizontalOffset = -0.2f;
-        [Tooltip("Vertical offset.")]
-        public float verticalOffset = 0f;
+        public float verticalOffset   = 0f;
 
         [Header("Inspection Scale")]
-        [Tooltip("Hologram size multiplier relative to the planet's sky scale. 0.05 = palm-sized, 0.2 = basketball-sized.")]
+        [Tooltip("Hologram size multiplier relative to the object's sky scale. 0.05 = palm-sized.")]
         [Range(0.01f, 1f)]
         public float inspectionSize = 0.05f;
 
@@ -41,10 +44,26 @@ namespace CelestiaVR.Interaction
         [Tooltip("Degrees per second the inspected copy rotates.")]
         public float hologramSpinSpeed = 30f;
 
+        [Header("Real Scale Auto-trigger")]
+        [Tooltip("Seconds after hologram appears before real scale shows automatically.")]
+        public float realScaleDelay = 1f;
+        [Tooltip("Earth radius in Unity metres used as the baseline for real-scale display.")]
+        public float earthRadiusMetres = 0.08f;
+        [Tooltip("Max hologram radius in metres — prevents huge objects from filling the room.")]
+        public float maxRealScaleMetres = 4f;
+
+        // ── Runtime ───────────────────────────────────────────────────────────────
+
         private Camera _xrCamera;
         private CelestialBody _inspectedBody;
         private Coroutine _currentAnimation;
+        private Coroutine _scaleAnimation;
+        private Coroutine _autoRealScaleCoroutine;
         private GameObject _hologramCopy;
+        private Vector3 _defaultHologramScale;
+        private RealScaleComparison _realScaleComp;
+
+        // ── Lifecycle ─────────────────────────────────────────────────────────────
 
         private void Awake()
         {
@@ -56,8 +75,20 @@ namespace CelestiaVR.Interaction
             if (selectionManager != null)
             {
                 selectionManager.OnObjectSelected += StartInspection;
-                selectionManager.OnDeselect += ExitInspection;
+                selectionManager.OnDeselect       += ExitInspection;
             }
+
+            // Auto-create InspectionPanel if none assigned
+            if (inspectionPanel == null)
+            {
+                var panelGO = new GameObject("[InspectionPanel]");
+                inspectionPanel = panelGO.AddComponent<InspectionPanel>();
+                inspectionPanel.inspectionController = this;
+                Debug.Log("[InspectionController] Auto-created InspectionPanel.");
+            }
+
+            // RealScaleComparison lives on this same GO
+            _realScaleComp = gameObject.AddComponent<RealScaleComparison>();
         }
 
         private void OnDestroy()
@@ -65,23 +96,22 @@ namespace CelestiaVR.Interaction
             if (selectionManager != null)
             {
                 selectionManager.OnObjectSelected -= StartInspection;
-                selectionManager.OnDeselect -= ExitInspection;
+                selectionManager.OnDeselect       -= ExitInspection;
             }
         }
+
+        // ── Inspection lifecycle ──────────────────────────────────────────────────
 
         public void StartInspection(CelestialBody body)
         {
             Debug.Log($"[InspectionController] StartInspection: {body.objectName}");
 
-            // Dismiss any current inspection first
-            if (_hologramCopy != null)
-                DismissHologram();
+            if (_hologramCopy != null) DismissHologram();
 
             _inspectedBody = body;
             body.isInspecting = true;
 
-            if (_currentAnimation != null)
-                StopCoroutine(_currentAnimation);
+            if (_currentAnimation != null) StopCoroutine(_currentAnimation);
             _currentAnimation = StartCoroutine(AnimateIn(body));
         }
 
@@ -93,9 +123,11 @@ namespace CelestiaVR.Interaction
             _inspectedBody.isInspecting = false;
             _inspectedBody = null;
 
-            if (_currentAnimation != null)
-                StopCoroutine(_currentAnimation);
+            if (_currentAnimation       != null) StopCoroutine(_currentAnimation);
+            if (_scaleAnimation         != null) StopCoroutine(_scaleAnimation);
+            if (_autoRealScaleCoroutine != null) StopCoroutine(_autoRealScaleCoroutine);
 
+            _realScaleComp?.Hide();
             DismissHologram();
             inspectionPanel?.Hide();
         }
@@ -109,18 +141,18 @@ namespace CelestiaVR.Interaction
             }
         }
 
+        // ── Update ────────────────────────────────────────────────────────────────
+
         private void Update()
         {
             if (_hologramCopy == null) return;
 
-            // Smoothly follow the camera so it stays in front of the user
             Vector3 target = GetInspectionWorldPosition();
             _hologramCopy.transform.position = Vector3.Lerp(
                 _hologramCopy.transform.position, target, Time.deltaTime * 3f);
 
             if (_inspectedBody != null && _inspectedBody.bodyType == CelestialBodyType.DeepSkyObject)
             {
-                // Keep image facing the camera — spinning a flat quad just shows the edge
                 _hologramCopy.transform.rotation = Quaternion.LookRotation(
                     _hologramCopy.transform.position - _xrCamera.transform.position);
             }
@@ -130,61 +162,130 @@ namespace CelestiaVR.Interaction
             }
         }
 
+        // ── Animate in ────────────────────────────────────────────────────────────
+
         private IEnumerator AnimateIn(CelestialBody body)
         {
-            // Spawn a copy — the original stays in the sky
             _hologramCopy = Instantiate(body.gameObject);
             _hologramCopy.name = $"{body.objectName}_Hologram";
 
-            // Remove CelestialBody/Collider from copy so it doesn't interfere with selection
             var copyBody = _hologramCopy.GetComponent<CelestialBody>();
             if (copyBody != null) Destroy(copyBody);
             foreach (var col in _hologramCopy.GetComponentsInChildren<Collider>())
                 Destroy(col);
 
-            // DSOs are flat quads — use a fixed comfortable viewing size instead of
-            // scaling down from their large sky size (which produces inconsistent results).
             Vector3 finalScale = body.bodyType == CelestialBodyType.DeepSkyObject
                 ? Vector3.one * 0.6f
                 : body.transform.localScale * inspectionSize;
 
+            _defaultHologramScale = finalScale;
+
             Vector3 spawnPos = GetInspectionWorldPosition();
-            _hologramCopy.transform.position = spawnPos;
+            _hologramCopy.transform.position   = spawnPos;
             _hologramCopy.transform.localScale = Vector3.zero;
 
-            Debug.Log($"[InspectionController] Hologram spawned for {body.objectName} at {spawnPos}, finalScale={finalScale}");
-
-            // Scale up from zero (sci-fi materialise effect)
             float elapsed = 0f;
             while (elapsed < animationDuration)
             {
                 elapsed += Time.deltaTime;
                 float t = easeCurve.Evaluate(Mathf.Clamp01(elapsed / animationDuration));
 
-                // Gently follow camera so it stays in front if user moves slightly
-                _hologramCopy.transform.position = Vector3.Lerp(spawnPos, GetInspectionWorldPosition(), t);
+                _hologramCopy.transform.position   = Vector3.Lerp(spawnPos, GetInspectionWorldPosition(), t);
                 _hologramCopy.transform.localScale = Vector3.Lerp(Vector3.zero, finalScale, t);
-                spawnPos = _hologramCopy.transform.position; // update so lerp doesn't snap
+                spawnPos = _hologramCopy.transform.position;
 
                 yield return null;
             }
 
             _hologramCopy.transform.localScale = finalScale;
             inspectionPanel?.Show(body);
-            Debug.Log($"[InspectionController] {body.objectName} hologram fully materialised.");
+            Debug.Log($"[InspectionController] {body.objectName} hologram materialised.");
+
+            // Auto-trigger real scale comparison for bodies with known physical size
+            if (body.physicalRadiusKm > 0f)
+            {
+                if (_autoRealScaleCoroutine != null) StopCoroutine(_autoRealScaleCoroutine);
+                _autoRealScaleCoroutine = StartCoroutine(AutoTriggerRealScale(body));
+            }
         }
+
+        // ── Real scale ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Animates the hologram to a specific radius in metres and shows the Earth comparison.
+        /// Pass -1 to revert to the default sky-proportional scale and hide comparison.
+        /// Called by InspectionPanel's Real Scale button and auto-triggered after hologram appears.
+        /// </summary>
+        public void SetHologramRadius(float radiusMetres)
+        {
+            if (_hologramCopy == null) return;
+
+            bool isRealScale = radiusMetres >= 0f;
+
+            Vector3 targetScale = isRealScale
+                ? Vector3.one * (radiusMetres * 2f) // diameter
+                : _defaultHologramScale;
+
+            if (_scaleAnimation != null) StopCoroutine(_scaleAnimation);
+            _scaleAnimation = StartCoroutine(AnimateScale(_hologramCopy.transform.localScale, targetScale));
+
+            inspectionPanel?.SetRealScaleState(isRealScale);
+
+            if (isRealScale && _inspectedBody != null && _realScaleComp != null)
+            {
+                float km      = _inspectedBody.physicalRadiusKm;
+                float earthKm = 6_371f;
+                string scaleText = km >= earthKm
+                    ? $"{km / earthKm:F1}× Earth"
+                    : $"1/{earthKm / km:F1} of Earth";
+
+                _realScaleComp.Show(_hologramCopy.transform, radiusMetres, earthRadiusMetres, scaleText);
+                Debug.Log($"[InspectionController] Real scale: {_inspectedBody.objectName} = {scaleText}");
+            }
+            else
+            {
+                _realScaleComp?.Hide();
+            }
+        }
+
+        private IEnumerator AutoTriggerRealScale(CelestialBody body)
+        {
+            yield return new WaitForSeconds(realScaleDelay);
+
+            // Only proceed if still inspecting the same body
+            if (_inspectedBody != body || _hologramCopy == null) yield break;
+
+            float targetMetres = Mathf.Min(
+                body.physicalRadiusKm / 6_371f * earthRadiusMetres,
+                maxRealScaleMetres);
+
+            SetHologramRadius(targetMetres);
+        }
+
+        private IEnumerator AnimateScale(Vector3 from, Vector3 to, float duration = 0.5f)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                if (_hologramCopy != null)
+                    _hologramCopy.transform.localScale = Vector3.Lerp(from, to,
+                        easeCurve.Evaluate(Mathf.Clamp01(elapsed / duration)));
+                yield return null;
+            }
+            if (_hologramCopy != null)
+                _hologramCopy.transform.localScale = to;
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────────
 
         private Vector3 GetInspectionWorldPosition()
         {
             if (_xrCamera == null) _xrCamera = Camera.main;
-            Vector3 forward = _xrCamera.transform.forward;
-            Vector3 right = _xrCamera.transform.right;
-            Vector3 up = _xrCamera.transform.up;
-
             return _xrCamera.transform.position
-                + forward * inspectionDistance
-                + right * horizontalOffset
-                + up * verticalOffset;
+                + _xrCamera.transform.forward * inspectionDistance
+                + _xrCamera.transform.right   * horizontalOffset
+                + _xrCamera.transform.up      * verticalOffset;
         }
     }
 }

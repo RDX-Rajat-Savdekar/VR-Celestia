@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using CelestiaVR.Interaction;
+using CelestiaVR.Stars;
+using CelestiaVR.UI;
 
 namespace CelestiaVR.Core
 {
@@ -18,6 +20,8 @@ namespace CelestiaVR.Core
             DisableSceneLights();
             FixCamera();
             WireInteraction();
+            EnsureSkyLabels();
+            EnsureViewingMode();
 
             Debug.Log("[StargazingSceneBootstrap] Scene wired up.");
         }
@@ -75,10 +79,52 @@ namespace CelestiaVR.Core
             if (dwell != null && dwell.gazeCamera == null)
                 dwell.gazeCamera = Camera.main;
 
+            // Auto-add BillboardStarDwellDetector on the same GO as DwellSelector
+            // so all GPU-instanced billboard stars are also dwellable.
+            if (dwell != null && dwell.GetComponent<BillboardStarDwellDetector>() == null)
+            {
+                dwell.gameObject.AddComponent<BillboardStarDwellDetector>();
+                Debug.Log("[Bootstrap] Auto-added BillboardStarDwellDetector to " + dwell.gameObject.name);
+            }
+
             var selMgr    = FindFirstObjectByType<SelectionManager>();
             var inspector = FindFirstObjectByType<InspectionController>();
             if (selMgr != null && inspector != null && inspector.selectionManager == null)
                 inspector.selectionManager = selMgr;
+
+            // ConstellationHIPRenderer auto-wires itself but needs SkyManager reference
+            // (handled in its own Awake — nothing to do here)
+
+            // InspectionPanel must NEVER be inactive — its coroutines break on inactive GOs.
+            // Force-activate any InspectionPanel found in the scene.
+            var panel = FindFirstObjectByType<InspectionPanel>(FindObjectsInactive.Include);
+            if (panel != null && !panel.gameObject.activeInHierarchy)
+            {
+                panel.gameObject.SetActive(true);
+                Debug.Log("[Bootstrap] Force-activated InspectionPanel on " + panel.gameObject.name);
+            }
+        }
+
+        private void EnsureSkyLabels()
+        {
+            // Auto-add SkyLabelManager if not already in the scene
+            if (FindFirstObjectByType<SkyLabelManager>() == null)
+            {
+                var go = new GameObject("[SkyLabelManager]");
+                go.AddComponent<SkyLabelManager>();
+                Debug.Log("[Bootstrap] Auto-created SkyLabelManager.");
+            }
+        }
+
+        private void EnsureViewingMode()
+        {
+            // Auto-add ViewingModeManager singleton if not already in the scene
+            if (FindFirstObjectByType<ViewingModeManager>() == null)
+            {
+                var go = new GameObject("[ViewingModeManager]");
+                go.AddComponent<ViewingModeManager>();
+                Debug.Log("[Bootstrap] Auto-created ViewingModeManager (Observe mode by default, press M to toggle).");
+            }
         }
     }
 }

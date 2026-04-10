@@ -454,7 +454,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b93da8761f56b46feaf98cad9257e342, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Interaction.InspectionController
-  inspectionPanel: {fileID: 2013652373}
+  inspectionPanel: {fileID: 0}
   selectionManager: {fileID: 550919778}
   inspectionDistance: 1.5
   horizontalOffset: -0.2
@@ -486,6 +486,9 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   hologramSpinSpeed: 60
+  realScaleDelay: 1
+  earthRadiusMetres: 0.08
+  maxRealScaleMetres: 4
 --- !u!4 &270010335
 Transform:
   m_ObjectHideFlags: 0
@@ -1036,6 +1039,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 630639571}
+  - component: {fileID: 630639572}
+  - component: {fileID: 630639574}
+  - component: {fileID: 630639573}
   m_Layer: 0
   m_Name: ConstellationRoot
   m_TagString: Untagged
@@ -1058,6 +1064,58 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2016144800}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &630639572
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 630639570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 817c64744eb8f4b4fb13a43ae1b23a76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Constellations.ConstellationHIPRenderer
+  catalogParser: {fileID: 0}
+  lineOpacity: 0.35
+  lineColor: {r: 0.5, g: 0.75, b: 1, a: 0.35}
+  lineWidth: 0.18
+  showConstellations: 1
+  skyManager: {fileID: 0}
+--- !u!114 &630639573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 630639570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 989e2680d22de4ed0a484b6a8b13fe8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Constellations.StellariumLoader
+  showLines: 1
+  lineColor: {r: 0.35, g: 0.55, b: 1, a: 0.45}
+  lineWidth: 0.35
+  showArt: 1
+  artOpacity: 0.2
+  artTint: {r: 0.75, g: 0.85, b: 1, a: 1}
+--- !u!114 &630639574
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 630639570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1137ffa690da34c84a62ab236083a577, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Constellations.ConstellationArtRenderer
+  entries: []
+  artOpacity: 0.22
+  artTint: {r: 0.7, g: 0.8, b: 1, a: 1}
+  showArt: 1
 --- !u!1001 &652124635
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2626,6 +2684,8 @@ MonoBehaviour:
     apparentMagnitude: -0.5
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Venus
     prefab: {fileID: 5076879274432134403, guid: 3594591daac614f8287ddec545c7482c, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 2168c530fa67b4a94985913e5ffde439, type: 3}
@@ -2633,6 +2693,8 @@ MonoBehaviour:
     apparentMagnitude: -4
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Moon
     prefab: {fileID: 796142845331047480, guid: 2ff8b89b711e6484b935c0a9492df67f, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 2ae3fc2ea4f334cb38e670d10468554f, type: 3}
@@ -2640,6 +2702,8 @@ MonoBehaviour:
     apparentMagnitude: 0
     scaleMultiplier: 1
     overrideDisplaySize: 4.5
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Jupiter
     prefab: {fileID: 7524579942725688795, guid: 8d4a6b273b5074b3c82940ea81ee3651, type: 3}
     ephemerisFile: {fileID: 4900000, guid: ffc7e2bcc851c47d79eda46ca5a119d4, type: 3}
@@ -2647,6 +2711,8 @@ MonoBehaviour:
     apparentMagnitude: -2.5
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Mars
     prefab: {fileID: 6889099290102195368, guid: e57f09d0f514f4e229bb78d45b2e76b7, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 9d852acd0b7954e08b574ae5e5816c6b, type: 3}
@@ -2654,6 +2720,8 @@ MonoBehaviour:
     apparentMagnitude: 0.5
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Saturn
     prefab: {fileID: 4823143146726876910, guid: 36d9f229a68bc45329c5c4944325ae3e, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 7491a8a844ab443408722a964dcef40c, type: 3}
@@ -2661,6 +2729,8 @@ MonoBehaviour:
     apparentMagnitude: 0.001
     scaleMultiplier: 0.01
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Uranus
     prefab: {fileID: 7339641103837570230, guid: 4f8af1d3b49544183b7d80c4527821c8, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 7efd3a358b3bd4634b7f3a21da6e7ee0, type: 3}
@@ -2668,6 +2738,8 @@ MonoBehaviour:
     apparentMagnitude: 0
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   - planetName: Neptune
     prefab: {fileID: 2301614696674140981, guid: a3e1e5fb328944060ab83c0b985b140b, type: 3}
     ephemerisFile: {fileID: 4900000, guid: 3b8bd73f17afc437babed4b0a4135c82, type: 3}
@@ -2675,6 +2747,8 @@ MonoBehaviour:
     apparentMagnitude: 0
     scaleMultiplier: 1
     overrideDisplaySize: 0
+    physicalRadiusKm: 0
+    temperatureK: 0
   planetDisplaySize: 2
 --- !u!1 &1783572213
 GameObject:
@@ -2990,13 +3064,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.UI.InspectionPanel
   objectNameText: {fileID: 1275843055}
   objectTypeText: {fileID: 1318935909}
-  magnitudeText: {fileID: 425931424}
-  distanceText: {fileID: 52675878}
+  stat1Text: {fileID: 0}
+  stat2Text: {fileID: 0}
+  stat3Text: {fileID: 0}
   descriptionText: {fileID: 1973346654}
-  fadeDuration: 0.3
-  billboardToCamera: 1
+  realScaleButton: {fileID: 0}
+  realScaleLabel: {fileID: 0}
   panelDistance: 1.5
   horizontalOffset: 0.4
+  verticalOffset: 0
+  fadeDuration: 0.3
+  inspectionController: {fileID: 0}
+  earthRadiusMetres: 0.08
+  maxRealScaleMetres: 4
 --- !u!114 &2013652374
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3098,6 +3178,7 @@ GameObject:
   - component: {fileID: 2016144802}
   - component: {fileID: 2016144803}
   - component: {fileID: 2016144804}
+  - component: {fileID: 2016144805}
   m_Layer: 0
   m_Name: SkyManager
   m_TagString: Untagged
@@ -3181,7 +3262,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0367eed0bde5f403f9d5245d7baa4d47, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.UI.TimeScrollController
-  autoScrollHoursPerSecond: 2
+  autoScrollHoursPerSecond: 0
   hoursPerSecondAtFullTilt: 1
   gripSpeedMultiplier: 24
   inertiaDamping: 4
@@ -3201,6 +3282,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.IslandLightingFixer
   islandRoot: {fileID: 1428880190118617247}
   smoothness: 0.25
+--- !u!114 &2016144805
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2016144798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88abfe8ce231e460487b4c1ac636e413, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Interaction.BillboardStarDwellDetector
+  catalogParser: {fileID: 0}
+  dwellSelector: {fileID: 0}
+  skyManager: {fileID: 0}
+  gazeToleranceDegrees: 1.5
+  namedStarMagThreshold: 3
 --- !u!1 &2136151788
 GameObject:
   m_ObjectHideFlags: 0
