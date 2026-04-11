@@ -59,6 +59,9 @@ namespace CelestiaVR.Stars
         private MaterialPropertyBlock[] _propertyBlocks;
         private float[][] _baseBrightnesses;   // original per-star brightness
         private float[][] _twinklePhases;       // random per-star phase offset
+        private Vector3[][] _basePositions;     // unrotated world-space positions
+        private float[][] _baseSizes;           // per-star quad sizes
+        private Quaternion _lastSkyRotation = Quaternion.identity;
         private static readonly int ColorProp = Shader.PropertyToID("_Color");
         private static readonly int BrightnessProp = Shader.PropertyToID("_Brightness");
 
@@ -159,6 +162,8 @@ namespace CelestiaVR.Stars
             _propertyBlocks   = new MaterialPropertyBlock[batchCount];
             _baseBrightnesses = new float[batchCount][];
             _twinklePhases    = new float[batchCount][];
+            _basePositions    = new Vector3[batchCount][];
+            _baseSizes        = new float[batchCount][];
 
             for (int b = 0; b < batchCount; b++)
             {
@@ -167,6 +172,8 @@ namespace CelestiaVR.Stars
                 _matrices[b]         = new Matrix4x4[count];
                 _baseBrightnesses[b] = new float[count];
                 _twinklePhases[b]    = new float[count];
+                _basePositions[b]    = new Vector3[count];
+                _baseSizes[b]        = new float[count];
 
                 var block = new MaterialPropertyBlock();
                 var colors = new Vector4[count];
@@ -187,6 +194,8 @@ namespace CelestiaVR.Stars
                     float size = isNamedSphere ? 0f : baseSize + star.brightness * sizeByBrightness;
                     Vector3 pos = star.unitPosition * _skyManager.skyRadius;
                     Quaternion rot = Quaternion.LookRotation(-pos.normalized);
+                    _basePositions[b][i]    = pos;
+                    _baseSizes[b][i]        = size;
                     _matrices[b][i]         = Matrix4x4.TRS(pos, rot, Vector3.one * size);
                     colors[i]               = star.starColor;
                     brightnesses[i]         = star.brightness;
@@ -219,6 +228,22 @@ namespace CelestiaVR.Stars
             {
                 Debug.Log($"[StarRenderer] Now rendering {_matrices.Length} batches every frame.");
                 _renderLogDone = true;
+            }
+
+            // Recompute star positions when SkyManager rotation changes (once per second)
+            Quaternion skyRot = _skyManager.transform.rotation;
+            if (skyRot != _lastSkyRotation)
+            {
+                _lastSkyRotation = skyRot;
+                for (int b = 0; b < _matrices.Length; b++)
+                {
+                    for (int i = 0; i < _matrices[b].Length; i++)
+                    {
+                        Vector3 rotatedPos = skyRot * _basePositions[b][i];
+                        Quaternion rot = Quaternion.LookRotation(-rotatedPos.normalized);
+                        _matrices[b][i] = Matrix4x4.TRS(rotatedPos, rot, Vector3.one * _baseSizes[b][i]);
+                    }
+                }
             }
 
             float t = Time.time * twinkleSpeed;

@@ -1071,7 +1071,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 630639570}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 817c64744eb8f4b4fb13a43ae1b23a76, type: 3}
   m_Name: 
@@ -1107,7 +1107,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 630639570}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1137ffa690da34c84a62ab236083a577, type: 3}
   m_Name: 
@@ -2338,7 +2338,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8806329115733545878, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.169
+      value: -6.91
       objectReference: {fileID: 0}
     - target: {fileID: 8806329115733545878, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
       propertyPath: m_LocalPosition.y
@@ -2346,7 +2346,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8806329115733545878, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.8410001
+      value: -13.45
       objectReference: {fileID: 0}
     - target: {fileID: 8806329115733545878, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2750,6 +2750,96 @@ MonoBehaviour:
     physicalRadiusKm: 0
     temperatureK: 0
   planetDisplaySize: 2
+--- !u!1001 &1587525591
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1245046558832948911, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5267028100028532565, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_Name
+      value: tropical_island (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -27.63633
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -16.65088
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1672670511}
+  m_SourcePrefab: {fileID: 100100000, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+--- !u!1 &1672670510 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
+  m_PrefabInstance: {fileID: 1587525591}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1672670511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672670510}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5955d9c8ca33e441cb0aea65d741921c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.DayNightController
+  nightAmbient: {r: 0.05, g: 0.06, b: 0.15, a: 1}
+  dayAmbient: {r: 0.55, g: 0.62, b: 0.72, a: 1}
+  useDaySkyDome: 1
+  daySkyColor: {r: 0.05660379, g: 0.0542008, b: 0.0542008, a: 1}
+  twilightSpanDegrees: 24.9925
 --- !u!1 &1783572213
 GameObject:
   m_ObjectHideFlags: 0
@@ -3262,7 +3352,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0367eed0bde5f403f9d5245d7baa4d47, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.UI.TimeScrollController
-  autoScrollHoursPerSecond: 0
+  autoScrollHoursPerSecond: 0.001
   hoursPerSecondAtFullTilt: 1
   gripSpeedMultiplier: 24
   inertiaDamping: 4
@@ -3280,7 +3370,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 16895ebba8861452f997c75bdc0c0522, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.IslandLightingFixer
-  islandRoot: {fileID: 1428880190118617247}
+  islandRoot: {fileID: 1672670510}
   smoothness: 0.25
 --- !u!114 &2016144805
 MonoBehaviour:
@@ -3344,108 +3434,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &1428880190118617246
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1245046558832948911, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1245046558832948911, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_AnimatePhysics
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1245046558832948911, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_ApplyRootMotion
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3235676397503149202, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_Name
-      value: tropical_island
-      objectReference: {fileID: 0}
-    - target: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.68441
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.0005
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.05549
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598788270364516066, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1428880190118617248}
-  m_SourcePrefab: {fileID: 100100000, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
---- !u!1 &1428880190118617247 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5775195200563742315, guid: eb8b9c29e7b82410687f338942c1dbc1, type: 3}
-  m_PrefabInstance: {fileID: 1428880190118617246}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1428880190118617248
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1428880190118617247}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5955d9c8ca33e441cb0aea65d741921c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Environment.DayNightController
-  nightAmbient: {r: 0.03, g: 0.04, b: 0.08, a: 1}
-  dayAmbient: {r: 0.55, g: 0.65, b: 0.75, a: 1}
-  useDaySkyDome: 0
-  daySkyColor: {r: 0.13550197, g: 0.21337667, b: 0.3301887, a: 0}
-  twilightSpanDegrees: 18
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3463,4 +3451,4 @@ SceneRoots:
   - {fileID: 864005243}
   - {fileID: 793918440}
   - {fileID: 1120337024}
-  - {fileID: 1428880190118617246}
+  - {fileID: 1587525591}

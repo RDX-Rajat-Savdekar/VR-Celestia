@@ -123,7 +123,7 @@ namespace CelestiaVR.Interaction
             _badgeTMP = _badgeGO.AddComponent<TextMeshPro>();
             _badgeTMP.fontSize       = 5f;
             _badgeTMP.alignment      = TextAlignmentOptions.Center;
-            _badgeTMP.enableWordWrapping = false;
+            _badgeTMP.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
 
             // Outline for sky contrast
             _badgeTMP.outlineWidth  = 0.3f;

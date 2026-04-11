@@ -20,19 +20,29 @@ namespace CelestiaVR.UI
     public class SkyLabelManager : MonoBehaviour
     {
         [Header("Which bodies get labels")]
-        public bool labelPlanets      = true;
-        public bool labelMoons        = true;
-        public bool labelDeepSky      = true;
-        public bool labelNamedStars   = false; // named stars already have their own glow
+        public bool labelPlanets        = true;
+        public bool labelMoons          = true;
+        public bool labelDeepSky        = true;
+        public bool labelNamedStars     = false; // named stars already have their own glow
+        public bool labelConstellations = true;
+
+        [Header("Deep Sky / Planet (most prominent)")]
+        public Color deepSkyColor         = new Color(1.00f, 0.92f, 0.75f, 0.95f); // warm white
+        public float deepSkyWorldHeight   = 12f;
+        public Color planetColor          = new Color(1.00f, 1.00f, 1.00f, 0.90f); // bright white
+        public float planetWorldHeight    = 10f;
+
+        [Header("Moon")]
+        public Color moonColor            = new Color(0.85f, 0.85f, 0.85f, 0.65f);
+        public float moonWorldHeight      = 7f;
+
+        [Header("Constellation (most subtle)")]
+        public Color constellationLabelColor  = new Color(0.40f, 0.55f, 0.90f, 0.28f); // faint blue
+        public float constellationWorldHeight = 6f;
 
         [Header("Appearance")]
-        [Tooltip("Physical height of one line of text in Unity world units. " +
-                 "At sky radius 500 a value of 8 = ~0.9° angular height — clearly readable in VR.")]
-        public float labelWorldHeight  = 8f;
         [Tooltip("Vertical offset above the object center, in world units.")]
         public float verticalOffset    = 6f;
-        [Tooltip("Text colour.")]
-        public Color labelColor        = new Color(1f, 1f, 1f, 0.85f);
         [Tooltip("Outline colour for contrast against bright stars.")]
         public Color outlineColor      = new Color(0f, 0f, 0f, 0.6f);
 
@@ -94,13 +104,23 @@ namespace CelestiaVR.UI
         {
             return body.bodyType switch
             {
-                CelestialBodyType.Planet       => labelPlanets,
-                CelestialBodyType.Moon         => labelMoons,
+                CelestialBodyType.Planet        => labelPlanets,
+                CelestialBodyType.Moon          => labelMoons,
                 CelestialBodyType.DeepSkyObject => labelDeepSky,
                 CelestialBodyType.Star          => labelNamedStars,
-                _                              => false
+                CelestialBodyType.Constellation => labelConstellations,
+                _                               => false
             };
         }
+
+        private (Color color, float worldHeight) StyleForType(CelestialBodyType t) => t switch
+        {
+            CelestialBodyType.DeepSkyObject => (deepSkyColor,          deepSkyWorldHeight),
+            CelestialBodyType.Planet        => (planetColor,           planetWorldHeight),
+            CelestialBodyType.Moon          => (moonColor,             moonWorldHeight),
+            CelestialBodyType.Constellation => (constellationLabelColor, constellationWorldHeight),
+            _                               => (planetColor,           planetWorldHeight),
+        };
 
         private LabelEntry CreateLabel(CelestialBody body)
         {
@@ -111,18 +131,20 @@ namespace CelestiaVR.UI
             var tmp = go.AddComponent<TextMeshPro>();
             tmp.text           = body.objectName;
             tmp.alignment      = TextAlignmentOptions.Center;
-            tmp.color          = labelColor;
-            tmp.fontSize       = 5f;   // base; actual world size set via transform.localScale
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
 
-            // Outline for sky contrast
-            tmp.outlineWidth  = 0.2f;
+            // Outline for sky contrast — constellations get no outline (too faint to need it)
+            bool isConstellation = body.bodyType == CelestialBodyType.Constellation;
+            tmp.outlineWidth  = isConstellation ? 0f : 0.2f;
             tmp.outlineColor  = outlineColor;
 
-            // Scale so the text appears labelWorldHeight units tall in world space.
-            // TMP fontSize=5 ≈ 0.5 world units height at scale 1 (rough approximation).
-            // Target: labelWorldHeight units → scale = labelWorldHeight / 0.5 = labelWorldHeight * 2
-            float scale = labelWorldHeight * 2f;
+            var (color, worldH) = StyleForType(body.bodyType);
+            tmp.color    = color;
+            tmp.fontSize = 5f;   // base; actual world size set via transform.localScale
+
+            // Scale so the text appears worldH units tall in world space.
+            // TMP fontSize=5 ≈ 0.5 world units height at scale 1.
+            float scale = worldH * 2f;
             go.transform.localScale = Vector3.one * scale;
 
             // Initial position

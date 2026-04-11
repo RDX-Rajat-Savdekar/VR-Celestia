@@ -22,6 +22,9 @@ namespace CelestiaVR.Core
             WireInteraction();
             EnsureSkyLabels();
             EnsureViewingMode();
+            EnsureDirectionalArrow();
+            EnsureSearchSystem();
+            EnsureInputManager();
 
             Debug.Log("[StargazingSceneBootstrap] Scene wired up.");
         }
@@ -124,6 +127,37 @@ namespace CelestiaVR.Core
                 var go = new GameObject("[ViewingModeManager]");
                 go.AddComponent<ViewingModeManager>();
                 Debug.Log("[Bootstrap] Auto-created ViewingModeManager (Observe mode by default, press M to toggle).");
+            }
+        }
+
+        private void EnsureDirectionalArrow()
+        {
+            if (FindFirstObjectByType<DirectionalArrow>() == null)
+            {
+                var go = new GameObject("[DirectionalArrow]");
+                go.AddComponent<DirectionalArrow>();
+                Debug.Log("[Bootstrap] Auto-created DirectionalArrow.");
+            }
+        }
+
+        private void EnsureSearchSystem()
+        {
+            if (FindFirstObjectByType<CelestialSearchPanel>() == null)
+            {
+                var go = new GameObject("[CelestialSearch]");
+                go.AddComponent<CelestialSearchPanel>();
+                go.AddComponent<SearchPanelDwellDetector>();
+                Debug.Log("[Bootstrap] Auto-created CelestialSearchPanel + SearchPanelDwellDetector.");
+            }
+        }
+
+        private void EnsureInputManager()
+        {
+            if (FindFirstObjectByType<StargazingInputManager>() == null)
+            {
+                var go = new GameObject("[StargazingInputManager]");
+                go.AddComponent<StargazingInputManager>();
+                Debug.Log("[Bootstrap] Auto-created StargazingInputManager (X = search, Y = search fallback).");
             }
         }
     }

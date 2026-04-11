@@ -310,7 +310,7 @@ namespace CelestiaVR.UI
                 t.fontSize         = size;
                 t.color            = col;
                 t.alignment        = align;
-                t.enableWordWrapping = true;
+                t.textWrappingMode = TMPro.TextWrappingModes.Normal;
                 var trt = go.GetComponent<RectTransform>();
                 trt.sizeDelta = new Vector2(0, size * 1.35f);
                 return t;
@@ -343,7 +343,7 @@ namespace CelestiaVR.UI
             div2LE.preferredHeight = 1;
 
             descriptionText = MakeTMP("Desc", 17, new Color(0.8f, 0.85f, 0.95f, 0.8f), TextAlignmentOptions.TopLeft);
-            descriptionText.enableWordWrapping = true;
+            descriptionText.textWrappingMode = TMPro.TextWrappingModes.Normal;
             descriptionText.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 110);
 
             // Real Scale button

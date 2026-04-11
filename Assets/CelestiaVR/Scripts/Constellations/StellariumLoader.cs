@@ -94,6 +94,7 @@ namespace CelestiaVR.Constellations
 
             if (showLines) BuildLines(root, radius);
             if (showArt)   BuildArt(root, radius);
+            BuildConstellationMarkers(root, radius);
         }
 
         // ── Stick figures ─────────────────────────────────────────────────────────
@@ -285,6 +286,50 @@ namespace CelestiaVR.Constellations
 
             rollDeg = Vector3.SignedAngle(defaultRight, imageRight, -centerNorm);
             return true;
+        }
+
+        // ── Constellation markers (for labels + search) ───────────────────────────
+
+        /// <summary>
+        /// Creates an invisible centroid marker for each constellation so that
+        /// SkyLabelManager can place a floating name label, and the search panel
+        /// can list and navigate to constellations.
+        /// </summary>
+        private void BuildConstellationMarkers(Transform root, float radius)
+        {
+            int built = 0;
+            foreach (var def in ConstellationHIPData.All)
+            {
+                // Compute centroid of all unique HIP stars used by this constellation
+                var hipSet = new System.Collections.Generic.HashSet<int>(def.Segments);
+                var centroid = Vector3.zero;
+                int valid = 0;
+                foreach (int hip in hipSet)
+                {
+                    if (_hipPos.TryGetValue(hip, out Vector3 p))
+                    { centroid += p; valid++; }
+                }
+                if (valid == 0) continue;
+
+                centroid = (centroid / valid).normalized;
+
+                var go = new GameObject($"ConstellationMarker_{def.Abbreviation}");
+                go.transform.SetParent(root, false);
+                go.transform.localPosition = centroid * radius;
+
+                var body = go.AddComponent<CelestialBody>();
+                body.objectName   = def.Name;
+                body.bodyType     = CelestialBodyType.Constellation;
+                body.description  = $"{def.Name} ({def.Abbreviation}) — one of the 88 IAU constellations.";
+
+                // Large sphere collider so dwell-gaze can hit it even with star-sphere tolerance
+                var col = go.AddComponent<SphereCollider>();
+                col.radius    = 20f;
+                col.isTrigger = true;
+
+                built++;
+            }
+            Debug.Log($"[StellariumLoader] Created {built} constellation markers.");
         }
 
         // ── Public API ────────────────────────────────────────────────────────────
