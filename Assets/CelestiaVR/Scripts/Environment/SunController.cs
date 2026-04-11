@@ -18,6 +18,8 @@ namespace CelestiaVR.Environment
     public class SunController : MonoBehaviour
     {
         [Header("Visual — Sun Sphere")]
+        [Tooltip("Optional 3-D model prefab for the sun disc. If null a procedural sphere is used.")]
+        public GameObject sunPrefab;
         [Tooltip("Radius of the sun disc (Unity units). At sky radius 500, ~2.5 gives roughly 0.5° angular size.")]
         [Range(0.5f, 10f)]
         public float sunRadius = 2.5f;
@@ -56,6 +58,15 @@ namespace CelestiaVR.Environment
         // Throttle: only rebuild arc when sim-time shifts by ≥ this many minutes.
         private double _lastArcUpdateJD = double.MinValue;
         private const double ArcRebuildIntervalDays = 1.0 / 1440.0 * 5.0; // every 5 sim-minutes
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (sunPrefab == null)
+                sunPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/CelestiaVR_resources/PlanetTextures/Sphere/sun.prefab");
+        }
+#endif
 
         // ── Public API ────────────────────────────────────────────────────────────
 
@@ -127,41 +138,62 @@ namespace CelestiaVR.Environment
             _sunObject = new GameObject("SunDisc");
             _sunObject.transform.SetParent(transform, false);
 
-            // Core disc.
+            // Core — always procedural for the sky disc.
+            // sunPrefab is reserved for the inspection hologram (InspectionController).
+            // Using a prefab here risks wrong mesh scale at sky-sphere distances.
             var core = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             core.name = "Core";
             core.transform.SetParent(_sunObject.transform, false);
             core.transform.localScale = Vector3.one * (sunRadius * 2f);
             ApplyAdditiveMat(core.GetComponent<Renderer>(),
-                new Color(1f, 0.97f, 0.85f, 1f), renderQueue: 2997);
+                new Color(1.00f, 0.97f, 0.75f, 1f), renderQueue: 2997);
             Destroy(core.GetComponent<Collider>());
 
-            // Inner soft glow.
-            var glow = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            glow.name = "Glow";
-            glow.transform.SetParent(_sunObject.transform, false);
-            glow.transform.localScale = Vector3.one * (sunRadius * 2f * glowMultiplier);
-            ApplyAdditiveMat(glow.GetComponent<Renderer>(),
-                new Color(1f, 0.88f, 0.5f, 0.12f), renderQueue: 2996);
-            Destroy(glow.GetComponent<Collider>());
+            // ── Layered corona glow ────────────────────────────────────────────────
+            // Layer 1 — tight inner halo (warm yellow-white)
+            AddGlowLayer(_sunObject.transform, sunRadius * 2f * 1.6f,
+                new Color(1.00f, 0.95f, 0.60f, 0.35f), 2996);
+            // Layer 2 — mid corona (orange)
+            AddGlowLayer(_sunObject.transform, sunRadius * 2f * 2.8f,
+                new Color(1.00f, 0.70f, 0.20f, 0.15f), 2995);
+            // Layer 3 — outer diffuse halo (pale yellow)
+            AddGlowLayer(_sunObject.transform, sunRadius * 2f * glowMultiplier,
+                new Color(1.00f, 0.88f, 0.50f, 0.07f), 2994);
+            // Layer 4 — very wide atmospheric scatter (only visible in daylight sky)
+            AddGlowLayer(_sunObject.transform, sunRadius * 2f * glowMultiplier * 2f,
+                new Color(1.00f, 0.85f, 0.40f, 0.03f), 2993);
 
             // CelestialBody for selection.
             var body = _sunObject.AddComponent<CelestialBody>();
-            body.objectName        = "Sun";
-            body.bodyType          = CelestialBodyType.Star;
-            body.magnitude         = -26.74f;
-            body.physicalRadiusKm  = 695_700f;
-            body.temperatureK      = 5_778f;
-            body.spectralType      = "G2V";
+            // If a sun prefab is available, use it as the inspection hologram
+            // instead of cloning the procedural sky disc.
+            body.inspectionPrefab   = sunPrefab;
+            body.objectName         = "Sun";
+            body.bodyType           = CelestialBodyType.Star;
+            body.magnitude          = -26.74f;
+            body.physicalRadiusKm   = 695_700f;
+            body.temperatureK       = 5_778f;
+            body.spectralType       = "G2V";
             body.distanceLightYears = 0.0000158f; // 8.3 light-minutes
-            body.description       = "Our star, a G2V yellow dwarf. "
-                                   + "Surface temperature ~5,778 K, 696,000 km radius — "
-                                   + "109 times wider than Earth. "
-                                   + "The source of all light and life on Earth.";
+            body.description        = "Our star, a G2V yellow dwarf. "
+                                    + "Surface temperature ~5,778 K, 696,000 km radius — "
+                                    + "109 times wider than Earth. "
+                                    + "The source of all light and life on Earth.";
 
             // Generous collider for gaze selection.
             var col = _sunObject.AddComponent<SphereCollider>();
             col.radius = sunRadius * glowMultiplier;
+        }
+
+        /// <summary>Adds a single additive glow layer sphere parented to the sun object.</summary>
+        private static void AddGlowLayer(Transform parent, float diameter, Color color, int queue)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "GlowLayer";
+            go.transform.SetParent(parent, false);
+            go.transform.localScale = Vector3.one * diameter;
+            ApplyAdditiveMat(go.GetComponent<Renderer>(), color, queue);
+            Destroy(go.GetComponent<Collider>());
         }
 
         private void BuildArcRenderer()

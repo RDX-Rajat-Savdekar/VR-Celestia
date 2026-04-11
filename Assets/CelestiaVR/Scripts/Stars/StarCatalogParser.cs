@@ -66,7 +66,6 @@ namespace CelestiaVR.Stars
             yield return null; // let frame breathe
 
             var stars = ParseCSV(csvText);
-            Debug.Log($"[StarCatalogParser] Loaded {stars.Count} stars (mag ≤ {magnitudeLimit}).");
             OnCatalogLoaded?.Invoke(stars);
         }
 

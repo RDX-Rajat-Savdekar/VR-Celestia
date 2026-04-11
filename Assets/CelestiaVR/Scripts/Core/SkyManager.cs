@@ -115,10 +115,20 @@ namespace CelestiaVR.Core
 
         private void ApplySkyRotation()
         {
-            float rotY = CelestialCoordinates.GetSkyRotationDegrees(_simulatedTime, observerLongitude);
-            // Tilt by latitude so the pole is at the correct elevation
+            float rotY  = CelestialCoordinates.GetSkyRotationDegrees(_simulatedTime, observerLongitude);
             float tiltX = -(90f - observerLatitude);
-            transform.rotation = Quaternion.Euler(tiltX, rotY, 0f);
+
+            // Step 1 — tilt the sky so the celestial pole sits at the correct altitude
+            //          above the north horizon (latitude degrees above horizontal).
+            Quaternion tilt = Quaternion.Euler(tiltX, 0f, 0f);
+
+            // Step 2 — rotate around the POLE AXIS (not world Y / zenith).
+            //          Without this fix, stars appeared to orbit overhead like a carousel;
+            //          correct behaviour is arcing from east to west around the pole.
+            Vector3    poleAxis  = tilt * Vector3.up;          // pole direction in world space
+            Quaternion sidereal  = Quaternion.AngleAxis(rotY, poleAxis);
+
+            transform.rotation = sidereal * tilt;
 
             // Keep the panoramic skybox in sync with sidereal rotation
             if (RenderSettings.skybox != null)

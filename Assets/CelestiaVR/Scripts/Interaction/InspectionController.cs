@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using CelestiaVR.Core;
 using CelestiaVR.UI;
+using CelestiaVR.Planets;
 
 namespace CelestiaVR.Interaction
 {
@@ -21,6 +22,9 @@ namespace CelestiaVR.Interaction
         [Header("References")]
         public InspectionPanel inspectionPanel;
         public SelectionManager selectionManager;
+        [Tooltip("Optional Earth 3-D model prefab for the real-scale comparison sphere. " +
+                 "If null a plain blue sphere is used.")]
+        public GameObject earthPrefab;
 
         [Header("Inspection Position")]
         [Tooltip("Distance in front of the camera (metres).")]
@@ -44,13 +48,14 @@ namespace CelestiaVR.Interaction
         [Tooltip("Degrees per second the inspected copy rotates.")]
         public float hologramSpinSpeed = 30f;
 
-        [Header("Real Scale Auto-trigger")]
-        [Tooltip("Seconds after hologram appears before real scale shows automatically.")]
-        public float realScaleDelay = 1f;
+        [Header("Real Scale")]
         [Tooltip("Earth radius in Unity metres used as the baseline for real-scale display.")]
         public float earthRadiusMetres = 0.08f;
         [Tooltip("Max hologram radius in metres — prevents huge objects from filling the room.")]
-        public float maxRealScaleMetres = 4f;
+        public float maxRealScaleMetres = 0.15f;
+        [Tooltip("Max hologram diameter (metres) for the default sky-proportional display. " +
+                 "Clamps Jupiter/Sun so they don't fill the whole view.")]
+        public float maxDefaultHologramDiameter = 0.22f;
 
         // ── Runtime ───────────────────────────────────────────────────────────────
 
@@ -58,10 +63,13 @@ namespace CelestiaVR.Interaction
         private CelestialBody _inspectedBody;
         private Coroutine _currentAnimation;
         private Coroutine _scaleAnimation;
-        private Coroutine _autoRealScaleCoroutine;
         private GameObject _hologramCopy;
         private Vector3 _defaultHologramScale;
         private RealScaleComparison _realScaleComp;
+        // Converts a desired world-space diameter (metres) → the localScale value that achieves it.
+        // For simple spheres: factor = 1 (localScale == world diameter).
+        // For prefab meshes: factor = 1 / meshBoundsSize (mesh is N units wide; localScale N = N-metre world size).
+        private float _hologramNormFactor = 1f;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -91,6 +99,15 @@ namespace CelestiaVR.Interaction
             _realScaleComp = gameObject.AddComponent<RealScaleComparison>();
         }
 
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (earthPrefab == null)
+                earthPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/CelestiaVR_resources/PlanetTextures/Sphere/Earth_1_12756.prefab");
+        }
+#endif
+
         private void OnDestroy()
         {
             if (selectionManager != null)
@@ -104,7 +121,6 @@ namespace CelestiaVR.Interaction
 
         public void StartInspection(CelestialBody body)
         {
-            Debug.Log($"[InspectionController] StartInspection: {body.objectName}");
 
             if (_hologramCopy != null) DismissHologram();
 
@@ -118,14 +134,12 @@ namespace CelestiaVR.Interaction
         public void ExitInspection()
         {
             if (_inspectedBody == null) return;
-            Debug.Log($"[InspectionController] ExitInspection: {_inspectedBody.objectName}");
 
             _inspectedBody.isInspecting = false;
             _inspectedBody = null;
 
-            if (_currentAnimation       != null) StopCoroutine(_currentAnimation);
-            if (_scaleAnimation         != null) StopCoroutine(_scaleAnimation);
-            if (_autoRealScaleCoroutine != null) StopCoroutine(_autoRealScaleCoroutine);
+            if (_currentAnimation != null) StopCoroutine(_currentAnimation);
+            if (_scaleAnimation   != null) StopCoroutine(_scaleAnimation);
 
             _realScaleComp?.Hide();
             DismissHologram();
@@ -166,7 +180,10 @@ namespace CelestiaVR.Interaction
 
         private IEnumerator AnimateIn(CelestialBody body)
         {
-            _hologramCopy = Instantiate(body.gameObject);
+            // Use the body's dedicated inspection prefab if available (e.g. the textured
+            // sun or planet model); otherwise fall back to cloning the sky GameObject.
+            GameObject source = body.inspectionPrefab != null ? body.inspectionPrefab : body.gameObject;
+            _hologramCopy = Instantiate(source);
             _hologramCopy.name = $"{body.objectName}_Hologram";
 
             var copyBody = _hologramCopy.GetComponent<CelestialBody>();
@@ -174,11 +191,42 @@ namespace CelestiaVR.Interaction
             foreach (var col in _hologramCopy.GetComponentsInChildren<Collider>())
                 Destroy(col);
 
-            Vector3 finalScale = body.bodyType == CelestialBodyType.DeepSkyObject
-                ? Vector3.one * 0.6f
-                : body.transform.localScale * inspectionSize;
+            // Scale the hologram by physical size relative to Earth, not by sky representation.
+            Vector3 finalScale;
+            if (body.bodyType == CelestialBodyType.DeepSkyObject)
+            {
+                finalScale = Vector3.one * 0.30f;
+                _hologramNormFactor = 1f;
+            }
+            else
+            {
+                float physR = body.physicalRadiusKm > 0f ? body.physicalRadiusKm : 6_371f;
+                float ratio = physR / 6_371f;
+                float diam  = earthRadiusMetres * 2f * ratio;
+                diam = Mathf.Clamp(diam, 0.15f, maxDefaultHologramDiameter); // 15 cm min, cap max
+
+                // If using a prefab, measure its raw mesh bounds so we can convert
+                // world-metres ↔ localScale. A Mercury_1_4878.prefab sphere is 4878 units
+                // wide at localScale=1; we need localScale = desiredMetres / 4878.
+                if (body.inspectionPrefab != null)
+                {
+                    _hologramCopy.transform.localScale = Vector3.one;
+                    float boundsSize    = PlanetController.GetNormalisedBoundsSize(_hologramCopy);
+                    _hologramNormFactor = boundsSize > 0f ? 1f / boundsSize : 1f;
+                }
+                else
+                {
+                    _hologramNormFactor = 1f; // simple sphere: localScale == world diameter
+                }
+
+                finalScale = Vector3.one * (diam * _hologramNormFactor);
+            }
 
             _defaultHologramScale = finalScale;
+
+            Debug.Log($"[InspectionController] Hologram '{body.objectName}': " +
+                      $"diam={finalScale.x / _hologramNormFactor * 100f:F1} cm, " +
+                      $"normFactor={_hologramNormFactor:G4}, localScale={finalScale.x:G4}");
 
             Vector3 spawnPos = GetInspectionWorldPosition();
             _hologramCopy.transform.position   = spawnPos;
@@ -199,14 +247,6 @@ namespace CelestiaVR.Interaction
 
             _hologramCopy.transform.localScale = finalScale;
             inspectionPanel?.Show(body);
-            Debug.Log($"[InspectionController] {body.objectName} hologram materialised.");
-
-            // Auto-trigger real scale comparison for bodies with known physical size
-            if (body.physicalRadiusKm > 0f)
-            {
-                if (_autoRealScaleCoroutine != null) StopCoroutine(_autoRealScaleCoroutine);
-                _autoRealScaleCoroutine = StartCoroutine(AutoTriggerRealScale(body));
-            }
         }
 
         // ── Real scale ────────────────────────────────────────────────────────────
@@ -222,9 +262,14 @@ namespace CelestiaVR.Interaction
 
             bool isRealScale = radiusMetres >= 0f;
 
+            // Convert world-metre radius → correct localScale using the normalisation factor
+            // computed when the hologram was first instantiated.
             Vector3 targetScale = isRealScale
-                ? Vector3.one * (radiusMetres * 2f) // diameter
+                ? Vector3.one * (radiusMetres * 2f * _hologramNormFactor) // diameter in localScale units
                 : _defaultHologramScale;
+
+            Debug.Log($"[InspectionController] SetHologramRadius: radiusM={radiusMetres:F4} " +
+                      $"normFactor={_hologramNormFactor:G4} → localScale={targetScale.x:G4}");
 
             if (_scaleAnimation != null) StopCoroutine(_scaleAnimation);
             _scaleAnimation = StartCoroutine(AnimateScale(_hologramCopy.transform.localScale, targetScale));
@@ -239,27 +284,13 @@ namespace CelestiaVR.Interaction
                     ? $"{km / earthKm:F1}× Earth"
                     : $"1/{earthKm / km:F1} of Earth";
 
-                _realScaleComp.Show(_hologramCopy.transform, radiusMetres, earthRadiusMetres, scaleText);
-                Debug.Log($"[InspectionController] Real scale: {_inspectedBody.objectName} = {scaleText}");
+                _realScaleComp.Show(_hologramCopy.transform, radiusMetres, earthRadiusMetres,
+                    scaleText, earthPrefab);
             }
             else
             {
                 _realScaleComp?.Hide();
             }
-        }
-
-        private IEnumerator AutoTriggerRealScale(CelestialBody body)
-        {
-            yield return new WaitForSeconds(realScaleDelay);
-
-            // Only proceed if still inspecting the same body
-            if (_inspectedBody != body || _hologramCopy == null) yield break;
-
-            float targetMetres = Mathf.Min(
-                body.physicalRadiusKm / 6_371f * earthRadiusMetres,
-                maxRealScaleMetres);
-
-            SetHologramRadius(targetMetres);
         }
 
         private IEnumerator AnimateScale(Vector3 from, Vector3 to, float duration = 0.5f)
@@ -282,8 +313,17 @@ namespace CelestiaVR.Interaction
         private Vector3 GetInspectionWorldPosition()
         {
             if (_xrCamera == null) _xrCamera = Camera.main;
+
+            // Push hologram farther when it is large so the user can see it fully
+            // without the model filling their entire field of view.
+            float hologramExtent = _defaultHologramScale == Vector3.zero ? 0f
+                : Mathf.Max(_defaultHologramScale.x, _defaultHologramScale.y, _defaultHologramScale.z) * 0.5f;
+            // Keep the object at least 3.5× its own radius away; minimum = inspectionDistance
+            float dynamicDist = Mathf.Max(inspectionDistance, hologramExtent * 3.5f + 0.3f);
+            dynamicDist = Mathf.Min(dynamicDist, 4.0f); // never push beyond 4 m
+
             return _xrCamera.transform.position
-                + _xrCamera.transform.forward * inspectionDistance
+                + _xrCamera.transform.forward * dynamicDist
                 + _xrCamera.transform.right   * horizontalOffset
                 + _xrCamera.transform.up      * verticalOffset;
         }

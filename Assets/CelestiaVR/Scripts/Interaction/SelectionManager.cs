@@ -44,7 +44,6 @@ namespace CelestiaVR.Interaction
             if (_dwellSelector != null)
             {
                 _dwellSelector.OnDwellSelect += HandleDwellSelect;
-                Debug.Log("[SelectionManager] Subscribed to DwellSelector.OnDwellSelect.");
             }
             else
             {
@@ -63,12 +62,7 @@ namespace CelestiaVR.Interaction
             // In Observe mode the user is just looking around — dwell triggers nothing.
             var modeMgr = ViewingModeManager.Instance;
             if (modeMgr != null && !modeMgr.IsInspectMode)
-            {
-                Debug.Log($"[SelectionManager] Dwell on '{body.objectName}' ignored — Observe mode.");
                 return;
-            }
-
-            Debug.Log($"[SelectionManager] Dwell-selected: {body.objectName} → triggering inspection.");
             if (_selectedBody != null && _selectedBody.isInspecting)
             {
                 OnDeselect?.Invoke();

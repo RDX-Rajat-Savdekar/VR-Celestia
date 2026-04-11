@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &7176657132883040171
+--- !u!1001 &3629720416039961051
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -10,27 +10,27 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.5
+      value: 0.001
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.5
+      value: 0.001
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.5
+      value: 0.001
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -4.098
+      value: -152.66728
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3.06161
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.32256
+      value: -746.7361
       objectReference: {fileID: 0}
     - target: {fileID: -3478968517500979503, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
       propertyPath: m_LocalRotation.w
@@ -64,10 +64,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Venus_1_12103
       objectReference: {fileID: 0}
-    - target: {fileID: 7417923192678441778, guid: f297c06b5d9fc42ad988d027d51307bb, type: 3}
-      propertyPath: m_Mesh
-      value: 
-      objectReference: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

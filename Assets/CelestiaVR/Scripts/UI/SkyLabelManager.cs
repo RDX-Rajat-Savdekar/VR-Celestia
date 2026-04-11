@@ -19,6 +19,8 @@ namespace CelestiaVR.UI
     /// </summary>
     public class SkyLabelManager : MonoBehaviour
     {
+        public static SkyLabelManager Instance { get; private set; }
+
         [Header("Which bodies get labels")]
         public bool labelPlanets        = true;
         public bool labelMoons          = true;
@@ -60,6 +62,12 @@ namespace CelestiaVR.UI
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+        private void Awake()
+        {
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
+        }
+
         private void Start()
         {
             _cam = Camera.main;
@@ -97,7 +105,6 @@ namespace CelestiaVR.UI
                 created++;
             }
 
-            Debug.Log($"[SkyLabelManager] Created {created} sky labels.");
         }
 
         private bool ShouldLabel(CelestialBody body)
@@ -204,5 +211,22 @@ namespace CelestiaVR.UI
             _labels.Clear();
             BuildLabels();
         }
+
+        /// <summary>Show or hide all planet (and moon) labels.</summary>
+        public void SetPlanetLabelsVisible(bool v)
+        {
+            labelPlanets = v;
+            labelMoons   = v;
+            foreach (var e in _labels)
+            {
+                if (e.labelGO == null || e.bodyTransform == null) continue;
+                var body = e.bodyTransform.GetComponent<CelestialBody>();
+                if (body == null) continue;
+                if (body.bodyType == CelestialBodyType.Planet || body.bodyType == CelestialBodyType.Moon)
+                    e.labelGO.SetActive(v);
+            }
+        }
+
+        public bool ArePlanetLabelsVisible => labelPlanets;
     }
 }

@@ -73,7 +73,6 @@ namespace CelestiaVR.Constellations
                     hipToPos[star.hipId] = star.unitPosition;
             }
 
-            Debug.Log($"[ConstellationHIPRenderer] Catalog loaded with {hipToPos.Count} HIP entries. Building constellation lines...");
             BuildLines(hipToPos);
         }
 
@@ -132,10 +131,6 @@ namespace CelestiaVR.Constellations
                 }
             }
 
-            int drawn = totalSegments - skippedSegments;
-            Debug.Log($"[ConstellationHIPRenderer] Built {drawn}/{totalSegments} segments across " +
-                      $"{ConstellationHIPData.All.Length} constellations. " +
-                      $"({skippedSegments} segments skipped — stars below mag limit or not in HIP.)");
         }
 
         private Material BuildLineMaterial()

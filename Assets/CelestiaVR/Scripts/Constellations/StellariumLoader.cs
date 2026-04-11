@@ -30,6 +30,8 @@ namespace CelestiaVR.Constellations
     /// </summary>
     public class StellariumLoader : MonoBehaviour
     {
+        public static StellariumLoader Instance { get; private set; }
+
         [Header("Stick Figures")]
         public bool  showLines   = true;
         public Color lineColor   = new Color(0.35f, 0.55f, 1f, 0.45f);
@@ -45,21 +47,27 @@ namespace CelestiaVR.Constellations
 
         // ── Runtime ──────────────────────────────────────────────────────────────
 
-        private SkyManager             _sky;
-        private Dictionary<int,Vector3> _hipPos = new();   // HIP id → unit direction
+        private SkyManager              _sky;
+        private Dictionary<int,Vector3> _hipPos  = new();
+        private readonly List<GameObject> _lineGOs = new();
+        private readonly List<GameObject> _artGOs  = new();
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
         private void Awake()
         {
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
             _sky = GetComponentInParent<SkyManager>();
 
-            // Disable legacy components if present
-            var legacyHIP = GetComponent<ConstellationHIPRenderer>();
-            if (legacyHIP != null) { legacyHIP.enabled = false; }
-
-            var legacyArt = GetComponent<ConstellationArtRenderer>();
-            if (legacyArt != null) { legacyArt.enabled = false; }
+            // Disable ALL legacy constellation renderers scene-wide — they draw a second,
+            // less-detailed line layer that shows through when StellariumLoader lines are toggled.
+            foreach (var r in FindObjectsByType<ConstellationHIPRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+                r.enabled = false;
+            foreach (var r in FindObjectsByType<ConstellationArtRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+                r.enabled = false;
         }
 
         private void Start()
@@ -79,7 +87,6 @@ namespace CelestiaVR.Constellations
                 if (s.hipId > 0 && !_hipPos.ContainsKey(s.hipId))
                     _hipPos[s.hipId] = s.unitPosition;
 
-            Debug.Log($"[StellariumLoader] Catalog loaded: {_hipPos.Count} HIP entries.");
             StartCoroutine(Build());
         }
 
@@ -131,10 +138,10 @@ namespace CelestiaVR.Constellations
 
                 lr.positionCount = pts.Count;
                 lr.SetPositions(pts.ToArray());
+                _lineGOs.Add(go);
                 built++;
             }
 
-            Debug.Log($"[StellariumLoader] Lines: {built} built, {skipped} skipped (missing HIP).");
         }
 
         private Material BuildLineMat()
@@ -204,10 +211,10 @@ namespace CelestiaVR.Constellations
                 go.GetComponent<Renderer>().material = mat;
 
                 go.SetActive(showArt);
+                _artGOs.Add(go);
                 built++;
             }
 
-            Debug.Log($"[StellariumLoader] Art quads: {built} built, {skipped} skipped (missing texture/HIP).");
         }
 
         private Material BuildArtMat()
@@ -329,22 +336,23 @@ namespace CelestiaVR.Constellations
 
                 built++;
             }
-            Debug.Log($"[StellariumLoader] Created {built} constellation markers.");
         }
 
         // ── Public API ────────────────────────────────────────────────────────────
 
         public void SetLinesVisible(bool v)
         {
-            foreach (Transform t in (_sky != null ? _sky.transform : transform))
-                if (t.name.StartsWith("Lines_")) t.gameObject.SetActive(v);
+            showLines = v;
+            foreach (var g in _lineGOs) if (g != null) g.SetActive(v);
         }
 
         public void SetArtVisible(bool v)
         {
             showArt = v;
-            foreach (Transform t in (_sky != null ? _sky.transform : transform))
-                if (t.name.StartsWith("Art_")) t.gameObject.SetActive(v);
+            foreach (var g in _artGOs) if (g != null) g.SetActive(v);
         }
+
+        public bool AreLinesVisible => showLines;
+        public bool IsArtVisible    => showArt;
     }
 }

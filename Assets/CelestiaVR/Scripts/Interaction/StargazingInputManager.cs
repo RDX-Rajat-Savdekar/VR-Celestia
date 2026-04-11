@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CelestiaVR.UI;
+using CelestiaVR.Interaction;
 
 namespace CelestiaVR.Interaction
 {
@@ -63,8 +64,8 @@ namespace CelestiaVR.Interaction
 
         private void ToggleSearch()
         {
-            if (CelestialSearchPanel.Instance != null)
-                CelestialSearchPanel.Instance.ToggleOpen();
+            if (ControlPanel.Instance != null)
+                ControlPanel.Instance.ToggleOpen();
         }
     }
 }

@@ -55,7 +55,6 @@ namespace CelestiaVR.Planets
 
         private void SpawnPlanets()
         {
-            Debug.Log($"[PlanetController] SpawnPlanets: {planets.Count} entries configured.");
             foreach (var entry in planets)
             {
                 if (entry.prefab == null)
@@ -63,6 +62,11 @@ namespace CelestiaVR.Planets
                     Debug.LogWarning($"[PlanetController] No prefab assigned for {entry.planetName}");
                     continue;
                 }
+
+                // Sun is handled entirely by SunController — skip it here to avoid
+                // spawning a duplicate sun object at the origin of PlanetRoot.
+                if (entry.planetName.Equals("Sun", StringComparison.OrdinalIgnoreCase))
+                    continue;
 
                 var go = Instantiate(entry.prefab, transform);
                 go.name = entry.planetName;
@@ -77,11 +81,12 @@ namespace CelestiaVR.Planets
                     ? (displaySize * multiplier) / modelSize
                     : displaySize * multiplier;
                 go.transform.localScale = Vector3.one * effectiveScale;
-                Debug.Log($"[PlanetController] {entry.planetName}: modelSize={modelSize:F2} → scale={effectiveScale:F4}");
-                Debug.Log($"[PlanetController] Spawned {entry.planetName} (prefab ok, ephemeris file: {(entry.ephemerisFile != null ? entry.ephemerisFile.name : "MISSING")})");
 
                 // Add CelestialBody component
                 var body = go.AddComponent<CelestialBody>();
+                // Store the source prefab so InspectionController can instantiate a fresh,
+                // unscaled copy for the hologram instead of cloning the sky-scaled object.
+                body.inspectionPrefab = entry.prefab;
                 body.objectName = entry.planetName;
                 body.bodyType = entry.planetName.Equals("Moon", StringComparison.OrdinalIgnoreCase)
                     ? CelestialBodyType.Moon
@@ -97,6 +102,21 @@ namespace CelestiaVR.Planets
                     ? entry.temperatureK
                     : GetBuiltInTemperatureK(entry.planetName);
 
+                // Enable emission on all renderers so planets appear as bright points at
+                // night (ambient is near-black; without emission they'd be invisible).
+                foreach (var rend in go.GetComponentsInChildren<Renderer>())
+                {
+                    foreach (var mat in rend.materials)
+                    {
+                        mat.EnableKeyword("_EMISSION");
+                        // Use the albedo colour as the emission tint at moderate brightness
+                        Color baseCol = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor")
+                                      : mat.HasProperty("_Color")    ? mat.GetColor("_Color")
+                                      : Color.white;
+                        mat.SetColor("_EmissionColor", baseCol * 0.35f);
+                    }
+                }
+
                 // Always add a root SphereCollider for reliable gaze raycasting.
                 // Child mesh colliders on complex prefabs are unreliable for sky-distance gaze.
                 // Remove any existing root collider first to avoid duplicates.
@@ -104,7 +124,6 @@ namespace CelestiaVR.Planets
                 if (existingCol != null) Destroy(existingCol);
                 var col = go.AddComponent<SphereCollider>();
                 col.radius = 2f;  // generous hit radius; world-size = 2 * planetDisplaySize
-                Debug.Log($"[PlanetController] Added SphereCollider (r=2) to {entry.planetName} root.");
 
                 // Parse ephemeris
                 var ephemeris = entry.ephemerisFile != null
@@ -113,8 +132,6 @@ namespace CelestiaVR.Planets
 
                 if (ephemeris.Count == 0)
                     Debug.LogWarning($"[PlanetController] No ephemeris data for {entry.planetName}");
-                else
-                    Debug.Log($"[PlanetController] {entry.planetName}: loaded {ephemeris.Count} ephemeris entries.");
 
                 _planetInstances.Add((entry, go, ephemeris));
             }
@@ -123,6 +140,9 @@ namespace CelestiaVR.Planets
         /// Returns the size of the smallest individual renderer on the object (i.e. the planet sphere,
         /// not the rings). Using the minimum avoids Saturn's rings (which are huge in the GLB)
         /// blowing up the normalization and making the planet microscopic.
+        /// <summary>Also used by InspectionController to normalise hologram prefab bounds.</summary>
+        internal static float GetNormalisedBoundsSize(GameObject go) => GetMaxBoundsSize(go);
+
         private static float GetMaxBoundsSize(GameObject go)
         {
             var meshFilters = go.GetComponentsInChildren<MeshFilter>();
@@ -149,7 +169,6 @@ namespace CelestiaVR.Planets
 
             // No clamping — km-scale GLBs (e.g. Saturn rings at 1000u) must be divided correctly.
             // effectiveScale = planetDisplaySize / smallestSize gives the right root scale.
-            Debug.Log($"[PlanetController] {go.name} smallest mesh size = {smallestSize:F2}");
             return smallestSize;
         }
 
@@ -206,8 +225,6 @@ namespace CelestiaVR.Planets
                 // Face outward from center
                 go.transform.localRotation = Quaternion.LookRotation(go.transform.localPosition.normalized);
 
-                if (!_firstUpdateLogged)
-                    Debug.Log($"[PlanetController] {config.planetName} positioned at RA={ra:F2}h Dec={dec:F2}° → localPos={go.transform.localPosition}");
 
                 // Cache for inspection system
                 if (body != null) body.CacheTransform();

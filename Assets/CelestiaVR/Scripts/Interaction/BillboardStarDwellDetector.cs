@@ -94,7 +94,6 @@ namespace CelestiaVR.Interaction
 
                 _stars.Add(new BillboardStar { unitPos = star.unitPosition, data = star });
             }
-            Debug.Log($"[BillboardStarDwellDetector] Tracking {_stars.Count} billboard stars for gaze detection.");
         }
 
         // ── Per-frame detection ───────────────────────────────────────────────────

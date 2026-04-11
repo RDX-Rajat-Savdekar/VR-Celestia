@@ -7,8 +7,15 @@ namespace CelestiaVR.Interaction
 {
     /// <summary>
     /// Gaze-based dwell selection system.
-    /// Casts a ray from the XR camera/headset forward. When the ray hits a CelestialBody
-    /// collider and stays on it for <dwellTime> seconds, it fires OnDwellSelect.
+    ///
+    /// Selection strategy:
+    ///   • Collect all CelestialBodies whose colliders fall within the acquisition
+    ///     sphere-cast (radius = gazeTolerance). Pick the one whose world-space centre
+    ///     is angularly closest to the gaze forward — so nearby competing planets never
+    ///     steal focus from the one you're actually looking at.
+    ///   • Hysteresis: once a target is acquired, it is kept as long as gaze stays
+    ///     within gazeExitTolerance (> acquisition radius). This prevents the dwell
+    ///     accumulator from resetting due to slight head wobble.
     ///
     /// Attach to XR Origin or Camera Offset.
     /// </summary>
@@ -25,9 +32,14 @@ namespace CelestiaVR.Interaction
         [Tooltip("Layer mask for celestial objects.")]
         public LayerMask celestialLayers = ~0;
 
-        [Tooltip("Radius of the SphereCast — larger = more forgiving gaze tolerance at distance.")]
-        [Range(1f, 50f)]
-        public float gazeTolerance = 15f;
+        [Tooltip("Acquisition sphere-cast radius (Unity units). Larger = more forgiving initial lock-on.")]
+        [Range(1f, 80f)]
+        public float gazeTolerance = 20f;
+
+        [Tooltip("Exit sphere-cast radius. Gaze must move this far from the target centre before the " +
+                 "lock is released. Should be larger than gazeTolerance to avoid accumulator resets.")]
+        [Range(1f, 120f)]
+        public float gazeExitTolerance = 40f;
 
         [Header("References")]
         [Tooltip("The camera to cast the gaze ray from (usually Main Camera / XR Camera).")]
@@ -42,7 +54,7 @@ namespace CelestiaVR.Interaction
         private CelestialBody _currentTarget;
         private float _dwellAccumulator;
 
-        // ── Software injection (for billboard stars without colliders) ─────────────
+        // Software injection (for billboard stars without colliders)
         private CelestialBody _softwareTarget;
         private bool _softwareInjectedThisFrame;
 
@@ -63,8 +75,6 @@ namespace CelestiaVR.Interaction
 
             if (gazeCamera == null)
                 Debug.LogError("[DwellSelector] No gaze camera found! Assign Main Camera in Inspector.");
-            else
-                Debug.Log($"[DwellSelector] Using gaze camera: {gazeCamera.name}, maxDistance={maxDistance}, dwellTime={dwellTime}s");
         }
 
         private void Update()
@@ -72,53 +82,95 @@ namespace CelestiaVR.Interaction
             if (gazeCamera == null) return;
 
             Ray ray = new Ray(gazeCamera.transform.position, gazeCamera.transform.forward);
-            CelestialBody hit = null;
 
-            // SphereCast gives generous tolerance at sky distances (15-unit radius = ~1.7° at 500u)
-            if (Physics.SphereCast(ray, gazeTolerance, out RaycastHit hitInfo, maxDistance, celestialLayers))
-                hit = hitInfo.collider.GetComponentInParent<CelestialBody>();
+            // 1. Find best candidate in acquisition cone
+            CelestialBody hit = FindBestCandidate(ray);
 
-            // If physics found nothing, accept a software-injected target (billboard stars)
+            // 2. If no physics candidate, accept software-injected target (billboard stars)
             if (hit == null && _softwareInjectedThisFrame)
                 hit = _softwareTarget;
             _softwareInjectedThisFrame = false;
 
+            // 3. Hysteresis: if we already have a target, keep it as long as gaze hasn't
+            //    moved beyond the exit tolerance — prevents wobble-induced resets.
+            if (hit == null && _currentTarget != null && IsWithinExitTolerance(ray, _currentTarget))
+                hit = _currentTarget;
+
+            // 4. Target change
             if (hit != _currentTarget)
             {
                 if (_currentTarget != null)
-                {
-                    Debug.Log($"[DwellSelector] Gaze EXIT: {_currentTarget.objectName}");
                     OnGazeExit?.Invoke(_currentTarget);
-                }
 
                 _currentTarget = hit;
                 _dwellAccumulator = 0f;
 
                 if (_currentTarget != null)
-                {
-                    Debug.Log($"[DwellSelector] Gaze ENTER: {_currentTarget.objectName}");
                     OnGazeEnter?.Invoke(_currentTarget);
-                }
             }
 
+            // 5. Dwell accumulation
             if (_currentTarget != null)
             {
                 _dwellAccumulator += Time.deltaTime;
                 float progress = Mathf.Clamp01(_dwellAccumulator / dwellTime);
                 OnDwellProgress?.Invoke(_currentTarget, progress);
 
-                // Log progress at 25% intervals
-                float prevProgress = Mathf.Clamp01((_dwellAccumulator - Time.deltaTime) / dwellTime);
-                if (Mathf.FloorToInt(progress * 4) > Mathf.FloorToInt(prevProgress * 4))
-                    Debug.Log($"[DwellSelector] Dwell progress on {_currentTarget.objectName}: {progress * 100:F0}%");
-
                 if (_dwellAccumulator >= dwellTime)
                 {
-                    Debug.Log($"[DwellSelector] SELECTED: {_currentTarget.objectName} (dwell complete)");
                     OnDwellSelect?.Invoke(_currentTarget);
                     _dwellAccumulator = 0f; // prevent repeat firing
                 }
             }
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// SphereCastAll within acquisition radius, then returns the CelestialBody whose
+        /// world-space centre is angularly closest to the gaze direction.
+        /// This ensures nearby competing planets never steal focus.
+        /// </summary>
+        private CelestialBody FindBestCandidate(Ray ray)
+        {
+            var hits = Physics.SphereCastAll(ray, gazeTolerance, maxDistance, celestialLayers);
+
+            CelestialBody best      = null;
+            float         bestAngle = float.MaxValue;
+
+            foreach (var h in hits)
+            {
+                var body = h.collider.GetComponentInParent<CelestialBody>();
+                if (body == null) continue;
+
+                // Angle between gaze forward and direction to this body's world centre
+                Vector3 dirToBody = (body.transform.position - ray.origin).normalized;
+                float   angle     = Vector3.Angle(ray.direction, dirToBody);
+
+                if (angle < bestAngle)
+                {
+                    bestAngle = angle;
+                    best      = body;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Returns true if the gaze ray is still close enough to <paramref name="target"/>
+        /// to maintain the hysteresis lock (uses gazeExitTolerance, not acquisition radius).
+        /// </summary>
+        private bool IsWithinExitTolerance(Ray ray, CelestialBody target)
+        {
+            Vector3 dirToTarget = (target.transform.position - ray.origin).normalized;
+            float   dist        = Vector3.Distance(ray.origin, target.transform.position);
+
+            // Perpendicular distance from ray to target centre ≈ sin(angle) * dist
+            float angle       = Vector3.Angle(ray.direction, dirToTarget);
+            float perpDist    = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
+
+            return perpDist <= gazeExitTolerance;
         }
 
         /// <summary>Returns the currently gazed CelestialBody (null if none).</summary>

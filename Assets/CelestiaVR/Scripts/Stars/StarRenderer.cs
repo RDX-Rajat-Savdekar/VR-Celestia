@@ -75,16 +75,11 @@ namespace CelestiaVR.Stars
         private void OnStarsLoaded(List<StarData> stars)
         {
             _stars = stars;
-            Debug.Log($"[StarRenderer] Received {stars.Count} stars. Building render batches...");
 
             if (starMaterial == null)
             {
                 Debug.LogWarning("[StarRenderer] starMaterial not assigned — creating a fallback Unlit/Additive white material.");
                 starMaterial = CreateFallbackStarMaterial();
-            }
-            else
-            {
-                Debug.Log($"[StarRenderer] Using assigned material: {starMaterial.name}, shader: {starMaterial.shader.name}");
             }
 
             _quadMesh = CreateQuadMesh();
@@ -117,7 +112,6 @@ namespace CelestiaVR.Stars
             // Assign a procedural soft circular dot as the base texture
             mat.mainTexture = CreateStarDotTexture(64);
 
-            Debug.Log($"[StarRenderer] Fallback star material created (shader={mat.shader.name}, dot texture applied).");
             return mat;
         }
 
@@ -151,13 +145,9 @@ namespace CelestiaVR.Stars
         private void BuildBatches()
         {
             if (_stars == null || _stars.Count == 0)
-            {
-                Debug.LogWarning("[StarRenderer] BuildBatches called but star list is empty.");
                 return;
-            }
 
             int batchCount = Mathf.CeilToInt((float)_stars.Count / BatchSize);
-            Debug.Log($"[StarRenderer] Building {batchCount} GPU batches for {_stars.Count} stars (BatchSize={BatchSize}).");
             _matrices         = new Matrix4x4[batchCount][];
             _propertyBlocks   = new MaterialPropertyBlock[batchCount];
             _baseBrightnesses = new float[batchCount][];
@@ -206,29 +196,13 @@ namespace CelestiaVR.Stars
                 block.SetVectorArray(ColorProp, colors);
                 block.SetFloatArray(BrightnessProp, brightnesses);
                 _propertyBlocks[b] = block;
-                if (skipped > 0)
-                    Debug.Log($"[StarRenderer] Batch {b}: skipped {skipped} named-star billboard(s) (will be sphere objects).");
             }
         }
-
-        private bool _renderLogDone = false;
 
         private void Update()
         {
             if (_matrices == null || starMaterial == null)
-            {
-                if (!_renderLogDone)
-                {
-                    Debug.LogWarning($"[StarRenderer] Update: not rendering — matrices={_matrices != null}, material={starMaterial != null}");
-                    _renderLogDone = true;
-                }
                 return;
-            }
-            if (!_renderLogDone)
-            {
-                Debug.Log($"[StarRenderer] Now rendering {_matrices.Length} batches every frame.");
-                _renderLogDone = true;
-            }
 
             // Recompute star positions when SkyManager rotation changes (once per second)
             Quaternion skyRot = _skyManager.transform.rotation;

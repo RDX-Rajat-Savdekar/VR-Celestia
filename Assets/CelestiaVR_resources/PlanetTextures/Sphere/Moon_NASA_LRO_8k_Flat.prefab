@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &8778918919041158067
+--- !u!1001 &3934370890376684960
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -9,16 +9,28 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -7.32149
+      value: -152.66728
       objectReference: {fileID: 0}
     - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3.06161
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.32256
+      value: -746.7361
       objectReference: {fileID: 0}
     - target: {fileID: -1895251771027419747, guid: d0770e6ece9e345a6ac1a57f5d1e8afc, type: 3}
       propertyPath: m_LocalRotation.w

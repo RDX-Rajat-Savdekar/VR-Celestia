@@ -109,7 +109,6 @@ namespace CelestiaVR.Interaction
             CurrentMode = mode;
             RefreshBadge();
             OnModeChanged?.Invoke(mode);
-            Debug.Log($"[ViewingMode] → {mode}");
         }
 
         public void Toggle() => SetMode(IsInspectMode ? Mode.Observe : Mode.Inspect);

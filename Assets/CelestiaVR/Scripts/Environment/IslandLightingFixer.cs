@@ -100,7 +100,6 @@ namespace CelestiaVR.Environment
                 if (changed) r.materials = mats;
             }
 
-            Debug.Log($"[IslandLightingFixer] Shader-swapped {swapped} material(s) to URP Lit.");
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────

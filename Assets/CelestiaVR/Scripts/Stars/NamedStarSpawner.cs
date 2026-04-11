@@ -53,7 +53,6 @@ namespace CelestiaVR.Stars
                 SpawnStar(star);
                 count++;
             }
-            Debug.Log($"[NamedStarSpawner] Spawned {count} named-star sphere objects (mag < {magnitudeThreshold}).");
         }
 
         private void SpawnStar(StarData star)

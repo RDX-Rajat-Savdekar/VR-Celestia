@@ -3,6 +3,7 @@ using UnityEngine.Rendering;
 using CelestiaVR.Interaction;
 using CelestiaVR.Stars;
 using CelestiaVR.UI;
+using CelestiaVR.Constellations;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
@@ -21,7 +22,11 @@ namespace CelestiaVR.Core
             FixRenderSettings();
             DisableSceneLights();
             FixCamera();
+            DisableGazeInteractor();
             DisableTurnAndTeleport();
+            DisableXRInteractorVisuals();
+            DisableGazeDebugger();
+            DisableLegacyConstellationRenderers();
             WireInteraction();
             EnsureSkyLabels();
             EnsureViewingMode();
@@ -29,7 +34,7 @@ namespace CelestiaVR.Core
             EnsureSearchSystem();
             EnsureInputManager();
 
-            Debug.Log("[StargazingSceneBootstrap] Scene wired up.");
+            Debug.Log("[Bootstrap] Scene ready.");
         }
 
         /// <summary>
@@ -65,7 +70,6 @@ namespace CelestiaVR.Core
                 // "SunDirectionalLight" is created by SunController — leave it alone.
                 if (l.name == "SunDirectionalLight") continue;
                 l.enabled = false;
-                Debug.Log($"[StargazingSceneBootstrap] Disabled pre-existing directional light: {l.name}");
             }
         }
 
@@ -90,7 +94,6 @@ namespace CelestiaVR.Core
             if (dwell != null && dwell.GetComponent<BillboardStarDwellDetector>() == null)
             {
                 dwell.gameObject.AddComponent<BillboardStarDwellDetector>();
-                Debug.Log("[Bootstrap] Auto-added BillboardStarDwellDetector to " + dwell.gameObject.name);
             }
 
             var selMgr    = FindFirstObjectByType<SelectionManager>();
@@ -107,7 +110,6 @@ namespace CelestiaVR.Core
             if (panel != null && !panel.gameObject.activeInHierarchy)
             {
                 panel.gameObject.SetActive(true);
-                Debug.Log("[Bootstrap] Force-activated InspectionPanel on " + panel.gameObject.name);
             }
         }
 
@@ -117,25 +119,49 @@ namespace CelestiaVR.Core
         /// not by thumbstick turning. Right thumbstick is repurposed for time scroll.
         /// The red teleport arc that appears on thumbstick-up is suppressed here.
         /// </summary>
+        /// <summary>
+        /// The XR Starter Assets GazeInteractor shows a small reticle circle in the
+        /// simulator. We use our own DwellSelector, so disable the XR one entirely.
+        /// </summary>
+        private void DisableGazeInteractor()
+        {
+            // Disable by GazeInputManager component (Starter Assets)
+            foreach (var gim in FindObjectsByType<
+                UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets.GazeInputManager>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                gim.gameObject.SetActive(false);
+            }
+
+            // Also catch any GO with "Gaze" in the name that has a renderer (the reticle)
+            foreach (var t in FindObjectsByType<Transform>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (!t.name.Contains("Gaze") && !t.name.Contains("gaze")) continue;
+                var r = t.GetComponent<Renderer>();
+                if (r != null) { r.enabled = false; }
+                // Disable the GO if it's purely the gaze interactor
+                if (t.name.Contains("Gaze Interactor") || t.name.Contains("Eye Gaze"))
+                    t.gameObject.SetActive(false);
+            }
+        }
+
         private void DisableTurnAndTeleport()
         {
             // Snap turn — right thumbstick X rotates rig. We want that axis for time scroll.
             foreach (var t in FindObjectsByType<SnapTurnProvider>(FindObjectsSortMode.None))
             {
                 t.enabled = false;
-                Debug.Log($"[Bootstrap] Disabled SnapTurnProvider on '{t.gameObject.name}'.");
             }
             // Continuous turn (smooth) — disable for same reason.
             foreach (var t in FindObjectsByType<ContinuousTurnProvider>(FindObjectsSortMode.None))
             {
                 t.enabled = false;
-                Debug.Log($"[Bootstrap] Disabled ContinuousTurnProvider on '{t.gameObject.name}'.");
             }
             // Teleportation provider — disables the teleport action itself.
             foreach (var t in FindObjectsByType<TeleportationProvider>(FindObjectsSortMode.None))
             {
                 t.enabled = false;
-                Debug.Log($"[Bootstrap] Disabled TeleportationProvider on '{t.gameObject.name}'.");
             }
             // Deactivate any GameObjects named "Teleport*" — these are the ray interactors
             // that draw the red arc when the thumbstick is pushed upward.
@@ -144,9 +170,97 @@ namespace CelestiaVR.Core
                 if (t.name.Contains("Teleport") || t.name.Contains("teleport"))
                 {
                     t.gameObject.SetActive(false);
-                    Debug.Log($"[Bootstrap] Deactivated teleport object '{t.name}'.");
                 }
             }
+        }
+
+        /// <summary>
+        /// Disables all XR Interaction Toolkit ray interactor visuals — the white ray line
+        /// and the cursor/reticle dot shown at ray endpoints.  We draw our own blue ray in
+        /// ControlPanel, so the built-in visuals are unwanted noise.
+        /// Also disables any locomotion cursor shown by the move provider.
+        /// </summary>
+        private void DisableXRInteractorVisuals()
+        {
+            // Disable line-renderer visuals on all ray/near-far interactors
+            foreach (var c in FindObjectsByType<
+                UnityEngine.XR.Interaction.Toolkit.Interactors.Visuals.XRInteractorLineVisual>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                c.enabled = false;
+            }
+
+            // Disable reticle visuals (cursor dot at end of ray)
+            foreach (var c in FindObjectsByType<
+                UnityEngine.XR.Interaction.Toolkit.Interactors.Visuals.XRInteractorReticleVisual>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                c.enabled = false;
+            }
+
+            // Disable the Near-Far Interactor (XRI 3 combines near+far in one component)
+            foreach (var c in FindObjectsByType<
+                UnityEngine.XR.Interaction.Toolkit.Interactors.NearFarInteractor>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                c.enabled = false;
+            }
+
+            // Disable any remaining LineRenderers on controller child GOs whose name
+            // suggests they are ray/cursor visuals (catches custom visuals added by XRI3 template)
+            foreach (var lr in FindObjectsByType<LineRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var n = lr.gameObject.name.ToLower();
+                if (n.Contains("ray") || n.Contains("cursor") || n.Contains("reticle")
+                    || n.Contains("line visual") || n.Contains("pointer"))
+                    lr.enabled = false;
+            }
+
+            // Hide any small sprite/mesh renderers used as cursor dots on rig children
+            foreach (var t in FindObjectsByType<Transform>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var n = t.name.ToLower();
+                if (!n.Contains("reticle") && !n.Contains("cursor") && !n.Contains("dot")) continue;
+                // Don't touch our own SearchTargetReticle
+                if (t.GetComponent<CelestiaVR.UI.SearchTargetReticle>() != null) continue;
+                var r = t.GetComponent<Renderer>();
+                if (r != null) r.enabled = false;
+            }
+        }
+
+        /// <summary>Disables GazeDebugger — a dev-only component that floods the console.</summary>
+        private void DisableGazeDebugger()
+        {
+            foreach (var gd in FindObjectsByType<GazeDebugger>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                gd.enabled = false;
+                // Also destroy the cursor sphere it may have already spawned
+                var cursor = GameObject.Find("GazeCursor_DEBUG");
+                if (cursor != null) Destroy(cursor);
+            }
+        }
+
+        /// <summary>
+        /// Belt-and-suspenders: StellariumLoader already disables these in its Awake,
+        /// but Bootstrap runs in Start (after all Awakes) so this catches edge cases where
+        /// execution order causes ConstellationHIPRenderer.Start to run first and build lines.
+        /// </summary>
+        private void DisableLegacyConstellationRenderers()
+        {
+            foreach (var r in FindObjectsByType<ConstellationHIPRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                r.enabled = false;
+                // Destroy any LineRenderers it may have already built
+                foreach (var lr in r.GetComponentsInChildren<LineRenderer>())
+                    lr.enabled = false;
+            }
+            foreach (var r in FindObjectsByType<ConstellationArtRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+                r.enabled = false;
         }
 
         private void EnsureSkyLabels()
@@ -156,7 +270,6 @@ namespace CelestiaVR.Core
             {
                 var go = new GameObject("[SkyLabelManager]");
                 go.AddComponent<SkyLabelManager>();
-                Debug.Log("[Bootstrap] Auto-created SkyLabelManager.");
             }
         }
 
@@ -167,7 +280,6 @@ namespace CelestiaVR.Core
             {
                 var go = new GameObject("[ViewingModeManager]");
                 go.AddComponent<ViewingModeManager>();
-                Debug.Log("[Bootstrap] Auto-created ViewingModeManager (Observe mode by default, press M to toggle).");
             }
         }
 
@@ -177,18 +289,21 @@ namespace CelestiaVR.Core
             {
                 var go = new GameObject("[DirectionalArrow]");
                 go.AddComponent<DirectionalArrow>();
-                Debug.Log("[Bootstrap] Auto-created DirectionalArrow.");
+            }
+            if (FindFirstObjectByType<SearchTargetReticle>() == null)
+            {
+                var go = new GameObject("[SearchTargetReticle]");
+                go.AddComponent<SearchTargetReticle>();
             }
         }
 
         private void EnsureSearchSystem()
         {
-            if (FindFirstObjectByType<CelestialSearchPanel>() == null)
+            // ControlPanel replaces CelestialSearchPanel + SearchPanelDwellDetector
+            if (FindFirstObjectByType<ControlPanel>() == null)
             {
-                var go = new GameObject("[CelestialSearch]");
-                go.AddComponent<CelestialSearchPanel>();
-                go.AddComponent<SearchPanelDwellDetector>();
-                Debug.Log("[Bootstrap] Auto-created CelestialSearchPanel + SearchPanelDwellDetector.");
+                var go = new GameObject("[ControlPanel]");
+                go.AddComponent<ControlPanel>();
             }
         }
 
@@ -198,7 +313,6 @@ namespace CelestiaVR.Core
             {
                 var go = new GameObject("[StargazingInputManager]");
                 go.AddComponent<StargazingInputManager>();
-                Debug.Log("[Bootstrap] Auto-created StargazingInputManager (X = search, Y = search fallback).");
             }
         }
     }

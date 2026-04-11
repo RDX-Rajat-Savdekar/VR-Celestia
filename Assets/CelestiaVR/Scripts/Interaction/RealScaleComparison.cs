@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using CelestiaVR.Planets;
 
 namespace CelestiaVR.Interaction
 {
@@ -22,7 +23,8 @@ namespace CelestiaVR.Interaction
         private float        _bodyR;         // hologram radius in world-metres
         private float        _earthR;        // Earth sphere radius in world-metres
 
-        private GameObject   _earthGO;       // blue Earth primitive
+        private GameObject   _earthGO;       // Earth model (prefab or fallback primitive)
+        private GameObject   _earthPrefab;   // optional prefab reference
         private LineRenderer _line;          // line between the two spheres
         private TextMeshPro  _scaleLabel;    // e.g. "11.2× Earth"
         private TextMeshPro  _earthLabel;    // "Earth" above the sphere
@@ -39,15 +41,17 @@ namespace CelestiaVR.Interaction
         /// <param name="bodyRadiusM">Target world-space radius of the hologram (metres).</param>
         /// <param name="earthRadiusM">World-space radius of the Earth sphere (metres).</param>
         /// <param name="scaleText">Label string, e.g. "11.2× Earth".</param>
-        public void Show(Transform hologram, float bodyRadiusM, float earthRadiusM, string scaleText)
+        public void Show(Transform hologram, float bodyRadiusM, float earthRadiusM,
+            string scaleText, GameObject earthPrefab = null)
         {
             Hide(); // clean up previous if any
 
-            _hologram = hologram;
-            _bodyR    = bodyRadiusM;
-            _earthR   = earthRadiusM;
-            _cam      = Camera.main;
-            _active   = true;
+            _hologram    = hologram;
+            _bodyR       = bodyRadiusM;
+            _earthR      = earthRadiusM;
+            _earthPrefab = earthPrefab;
+            _cam         = Camera.main;
+            _active      = true;
 
             BuildEarth();
             BuildLine();
@@ -114,22 +118,43 @@ namespace CelestiaVR.Interaction
 
         private void BuildEarth()
         {
-            _earthGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            _earthGO.name = "EarthComparison";
+            if (_earthPrefab != null)
+            {
+                _earthGO      = Object.Instantiate(_earthPrefab);
+                _earthGO.name = "EarthComparison";
+            }
+            else
+            {
+                _earthGO      = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                _earthGO.name = "EarthComparison";
+                var rend = _earthGO.GetComponent<Renderer>();
+                var mat  = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                if (mat.shader.name == "Hidden/InternalErrorShader")
+                    mat = new Material(Shader.Find("Standard"));
+                mat.color    = new Color(0.20f, 0.50f, 0.90f, 1f);
+                rend.material = mat;
+            }
 
             // No collider — we don't want gaze to latch onto it
-            var col = _earthGO.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            foreach (var c in _earthGO.GetComponentsInChildren<Collider>())
+                Destroy(c);
 
-            _earthGO.transform.localScale = Vector3.one * (_earthR * 2f);
-
-            // Blue Earth material
-            var rend = _earthGO.GetComponent<Renderer>();
-            var mat  = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            if (mat.shader.name == "Hidden/InternalErrorShader")
-                mat  = new Material(Shader.Find("Standard")); // editor fallback
-            mat.color = new Color(0.20f, 0.50f, 0.90f, 1f);
-            rend.material = mat;
+            // Normalise prefab mesh bounds (e.g. Earth_1_12756.prefab has a 12756-unit mesh).
+            // Without this, localScale=0.16 on a 12756-unit mesh = 2040m world sphere.
+            float earthDiamM = _earthR * 2f;
+            if (_earthPrefab != null)
+            {
+                _earthGO.transform.localScale = Vector3.one;
+                float boundsSize = PlanetController.GetNormalisedBoundsSize(_earthGO);
+                float normFactor = boundsSize > 0f ? 1f / boundsSize : 1f;
+                _earthGO.transform.localScale = Vector3.one * (earthDiamM * normFactor);
+                Debug.Log($"[RealScaleComparison] Earth prefab bounds={boundsSize:G4}, " +
+                          $"normFactor={normFactor:G4}, localScale={earthDiamM * normFactor:G4}");
+            }
+            else
+            {
+                _earthGO.transform.localScale = Vector3.one * earthDiamM;
+            }
 
             // "Earth" label above the sphere
             var labelGO = new GameObject("EarthLabel");

@@ -2,6 +2,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using CelestiaVR.Core;
 using CelestiaVR.Interaction;
 
@@ -53,12 +54,25 @@ namespace CelestiaVR.UI
 
         // ── Runtime state ─────────────────────────────────────────────────────────
 
-        private CanvasGroup _canvasGroup;
-        private Camera _xrCamera;
-        private Coroutine _fadeCoroutine;
-        private bool _visible;
-        private bool _realScaleActive;
+        private CanvasGroup  _canvasGroup;
+        private Camera       _xrCamera;
+        private Coroutine    _fadeCoroutine;
+        private bool         _visible;
+        private bool         _realScaleActive;
         private CelestialBody _currentBody;
+
+        // Ray interaction (mirrors ControlPanel approach)
+        private Transform    _rightControllerTransform;
+        private InputAction  _triggerAction;
+        private bool         _triggerWasDown;
+        private float        _btnDwellTimer;
+        private bool         _btnHovered;
+        private GameObject   _realScaleBtnColliderGO;
+        private LineRenderer _rayLine;
+        private Image        _realScaleBtnBg;   // saved in AutoCreateUI for collider sync
+
+        private static readonly Color ColBtnIdle  = new Color(0.15f, 0.35f, 0.8f,  0.85f);
+        private static readonly Color ColBtnHover = new Color(0.30f, 0.60f, 1.0f,  1.00f);
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -81,6 +95,28 @@ namespace CelestiaVR.UI
                 inspectionController = FindFirstObjectByType<InspectionController>();
         }
 
+        private void Start()
+        {
+            _triggerAction = new InputAction("IPanelTrigger", InputActionType.Button,
+                binding: "<XRController>{RightHand}/triggerButton");
+            _triggerAction.Enable();
+
+            BuildRayLine();
+            BuildRealScaleCollider();
+        }
+
+        private void OnDestroy()
+        {
+            _triggerAction?.Disable();
+            _triggerAction?.Dispose();
+        }
+
+        private void Update()
+        {
+            if (!_visible) return;
+            HandleRayInteraction();
+        }
+
         private void LateUpdate()
         {
             if (!_visible) return;
@@ -95,6 +131,8 @@ namespace CelestiaVR.UI
             transform.position = Vector3.Lerp(transform.position, target, Time.deltaTime * 10f);
             transform.rotation = Quaternion.LookRotation(
                 transform.position - _xrCamera.transform.position);
+
+            SyncRealScaleCollider();
         }
 
         // ── Public API ────────────────────────────────────────────────────────────
@@ -108,6 +146,10 @@ namespace CelestiaVR.UI
             PopulateData(body);
             SetCanvasVisible(true);
 
+            // Enable collider only when body has physical size (same condition as button visibility)
+            if (_realScaleBtnColliderGO != null)
+                _realScaleBtnColliderGO.SetActive(body.physicalRadiusKm > 0f);
+
             if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
             _fadeCoroutine = StartCoroutine(FadeTo(1f));
         }
@@ -118,6 +160,9 @@ namespace CelestiaVR.UI
             _currentBody = null;
             _realScaleActive = false;
             UpdateRealScaleButton();
+            ClearBtnHover();
+            if (_rayLine != null) _rayLine.enabled = false;
+            if (_realScaleBtnColliderGO != null) _realScaleBtnColliderGO.SetActive(false);
 
             if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
             _fadeCoroutine = StartCoroutine(FadeAndHide());
@@ -248,6 +293,142 @@ namespace CelestiaVR.UI
             _canvasGroup.blocksRaycasts = visible;
         }
 
+        // ── Ray interaction ───────────────────────────────────────────────────────
+
+        private void HandleRayInteraction()
+        {
+            if (_realScaleBtnColliderGO == null || !_realScaleBtnColliderGO.activeSelf) return;
+
+            Ray  ray;
+            bool hasCtrl = TryGetControllerRay(out ray);
+            if (!hasCtrl) ray = new Ray(_xrCamera.transform.position, _xrCamera.transform.forward);
+
+            // Ray visual
+            if (_rayLine != null)
+            {
+                _rayLine.enabled = hasCtrl;
+                if (hasCtrl)
+                {
+                    _rayLine.SetPosition(0, ray.origin);
+                    _rayLine.SetPosition(1, ray.origin + ray.direction * 3f);
+                }
+            }
+
+            float    castR  = hasCtrl ? 0f : 0.08f;
+            bool     didHit = false;
+            RaycastHit h;
+            if (castR > 0f)
+                didHit = Physics.SphereCast(ray, castR, out h, 800f) && h.collider.gameObject == _realScaleBtnColliderGO;
+            else
+                didHit = Physics.Raycast(ray, out h, 800f) && h.collider.gameObject == _realScaleBtnColliderGO;
+
+            if (hasCtrl && _rayLine != null && _rayLine.enabled)
+                _rayLine.SetPosition(1, didHit ? h.point : ray.origin + ray.direction * 3f);
+
+            // Hover state
+            if (didHit != _btnHovered)
+            {
+                _btnHovered   = didHit;
+                _btnDwellTimer = 0f;
+                if (_realScaleBtnBg != null)
+                    _realScaleBtnBg.color = didHit ? ColBtnHover : ColBtnIdle;
+            }
+
+            if (!_btnHovered) { _triggerWasDown = GetRightTrigger(); return; }
+
+            // Trigger = instant press
+            bool trig     = GetRightTrigger();
+            bool tPressed = trig && !_triggerWasDown;
+            _triggerWasDown = trig;
+            if (tPressed) { OnRealScaleButtonPressed(); return; }
+
+            // Dwell fallback (1.5 s)
+            _btnDwellTimer += Time.deltaTime;
+            float t = _btnDwellTimer / 1.5f;
+            if (_realScaleBtnBg != null)
+                _realScaleBtnBg.color = Color.Lerp(ColBtnIdle, ColBtnHover, t);
+            if (_btnDwellTimer >= 1.5f) { _btnDwellTimer = 0f; OnRealScaleButtonPressed(); }
+        }
+
+        private void ClearBtnHover()
+        {
+            _btnHovered    = false;
+            _btnDwellTimer = 0f;
+            if (_realScaleBtnBg != null) _realScaleBtnBg.color = ColBtnIdle;
+        }
+
+        private void BuildRealScaleCollider()
+        {
+            // Canvas is 400 px wide × scale 0.001 → 0.40 m wide in world space.
+            // Button height is 30 px = 0.030 m. Use slightly smaller box.
+            var go = new GameObject("IPanelRealScaleBtn");
+            go.transform.SetParent(transform, false);
+            var bc   = go.AddComponent<BoxCollider>();
+            bc.size  = new Vector3(0.36f, 0.026f, 0.01f);
+            // Marker so SyncRealScaleCollider can find it easily
+            go.AddComponent<IPanelBtnMarker>();
+            _realScaleBtnColliderGO = go;
+            go.SetActive(false); // enabled by Show()
+        }
+
+        private void SyncRealScaleCollider()
+        {
+            if (_realScaleBtnColliderGO == null || _realScaleBtnBg == null) return;
+            if (!_realScaleBtnColliderGO.activeSelf) return;
+            var rt = _realScaleBtnBg.rectTransform;
+            Vector3 wc = rt.TransformPoint(rt.rect.center);
+            _realScaleBtnColliderGO.transform.position = wc + transform.forward * -0.005f;
+            _realScaleBtnColliderGO.transform.rotation = transform.rotation;
+        }
+
+        private void BuildRayLine()
+        {
+            var go = new GameObject("IPanelRayLine");
+            go.transform.SetParent(transform, false);
+            _rayLine = go.AddComponent<LineRenderer>();
+            Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                     ?? Shader.Find("Sprites/Default");
+            var mat = new Material(sh); mat.color = new Color(0.35f, 0.80f, 1f, 0.85f);
+            _rayLine.material     = mat;
+            _rayLine.startWidth   = 0.004f;
+            _rayLine.endWidth     = 0.001f;
+            _rayLine.positionCount = 2;
+            _rayLine.useWorldSpace = true;
+            _rayLine.enabled       = false;
+        }
+
+        private bool TryGetControllerRay(out Ray ray)
+        {
+            ray = default;
+            if (_rightControllerTransform == null)
+                _rightControllerTransform = FindRightControllerTransform();
+            if (_rightControllerTransform == null) return false;
+            ray = new Ray(_rightControllerTransform.position, _rightControllerTransform.forward);
+            return true;
+        }
+
+        private static Transform FindRightControllerTransform()
+        {
+            string[] candidates = {
+                "Right Controller", "RightHand Controller", "Right Hand Controller",
+                "Right Controller Stabilized", "Right Interaction Visual"
+            };
+            foreach (var n in candidates)
+            {
+                var go = GameObject.Find(n);
+                if (go != null) return go.transform;
+            }
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+            {
+                var n = t.name.ToLower();
+                if (n.Contains("right") && n.Contains("controller") && !n.Contains("teleport"))
+                    return t;
+            }
+            return null;
+        }
+
+        private bool GetRightTrigger() => _triggerAction != null && _triggerAction.IsPressed();
+
         // ── Auto-create UI ────────────────────────────────────────────────────────
 
         private void AutoCreateUI()
@@ -350,7 +531,8 @@ namespace CelestiaVR.UI
             var btnGO = new GameObject("RealScaleBtn");
             btnGO.transform.SetParent(layout.transform, false);
             var btnImg = btnGO.AddComponent<Image>();
-            btnImg.color = new Color(0.15f, 0.35f, 0.8f, 0.85f);
+            btnImg.color = ColBtnIdle;
+            _realScaleBtnBg = btnImg;
             var btnLE = btnGO.AddComponent<LayoutElement>();
             btnLE.preferredHeight = 30;
 
@@ -362,8 +544,6 @@ namespace CelestiaVR.UI
                 Color.white, TextAlignmentOptions.Center);
 
             realScaleLabel.text = "Real Scale";
-
-            Debug.Log("[InspectionPanel] Auto-created world-space panel UI.");
         }
 
         private static TextMeshProUGUI MakeChildTMP(Transform parent, string name,
@@ -387,4 +567,7 @@ namespace CelestiaVR.UI
             rt.offsetMin = rt.offsetMax = Vector2.zero;
         }
     }
+
+    /// <summary>Marks the InspectionPanel Real Scale button collider GO for identification.</summary>
+    internal class IPanelBtnMarker : MonoBehaviour { }
 }

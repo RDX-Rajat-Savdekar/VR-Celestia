@@ -149,10 +149,7 @@ namespace CelestiaVR.UI
 
                     var arrow = DirectionalArrow.Instance;
                     if (arrow != null)
-                    {
                         arrow.SetTarget(b);
-                        Debug.Log($"[SearchPanel] Auto-targeting '{b.objectName}' ({b.bodyType}) for testing.");
-                    }
                     return;
                 }
             }
@@ -213,15 +210,12 @@ namespace CelestiaVR.UI
             // Force canvas layout to recalculate so RectTransform.rect is valid
             Canvas.ForceUpdateCanvases();
             SyncColliderPositions();
-
-            Debug.Log("[SearchPanel] Opened.");
         }
 
         public void Close()
         {
             _isOpen = false;
             if (_panelRoot != null) _panelRoot.SetActive(false);
-            Debug.Log("[SearchPanel] Closed.");
         }
 
         // ── Trigger button ────────────────────────────────────────────────────────
@@ -465,7 +459,6 @@ namespace CelestiaVR.UI
             }
 
             _panelRoot.SetActive(false);
-            Debug.Log($"[SearchPanel] Built with {_items.Count} items.");
         }
 
         // ── Build one item cell (left or right column) ────────────────────────────

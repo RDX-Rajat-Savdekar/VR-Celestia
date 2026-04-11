@@ -36,6 +36,11 @@ namespace CelestiaVR.Core
         public float rightAscensionHours;
         public float declinationDegrees;
 
+        [Header("Inspection")]
+        [Tooltip("Optional 3-D model prefab to use for the inspection hologram. " +
+                 "If null, the body's own sky GameObject is cloned instead.")]
+        public GameObject inspectionPrefab;
+
         // Runtime: original sky position for restoring after inspection
         [HideInInspector] public Vector3 skyPosition;
         [HideInInspector] public Quaternion skyRotation;
