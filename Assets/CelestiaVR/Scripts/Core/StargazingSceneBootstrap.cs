@@ -3,6 +3,8 @@ using UnityEngine.Rendering;
 using CelestiaVR.Interaction;
 using CelestiaVR.Stars;
 using CelestiaVR.UI;
+using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
+using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
 namespace CelestiaVR.Core
 {
@@ -19,6 +21,7 @@ namespace CelestiaVR.Core
             FixRenderSettings();
             DisableSceneLights();
             FixCamera();
+            DisableTurnAndTeleport();
             WireInteraction();
             EnsureSkyLabels();
             EnsureViewingMode();
@@ -105,6 +108,44 @@ namespace CelestiaVR.Core
             {
                 panel.gameObject.SetActive(true);
                 Debug.Log("[Bootstrap] Force-activated InspectionPanel on " + panel.gameObject.name);
+            }
+        }
+
+        /// <summary>
+        /// Removes rotation (snap/continuous turn) and teleportation from the XR Rig.
+        /// This is a stationary stargazing experience — the user looks around with their head,
+        /// not by thumbstick turning. Right thumbstick is repurposed for time scroll.
+        /// The red teleport arc that appears on thumbstick-up is suppressed here.
+        /// </summary>
+        private void DisableTurnAndTeleport()
+        {
+            // Snap turn — right thumbstick X rotates rig. We want that axis for time scroll.
+            foreach (var t in FindObjectsByType<SnapTurnProvider>(FindObjectsSortMode.None))
+            {
+                t.enabled = false;
+                Debug.Log($"[Bootstrap] Disabled SnapTurnProvider on '{t.gameObject.name}'.");
+            }
+            // Continuous turn (smooth) — disable for same reason.
+            foreach (var t in FindObjectsByType<ContinuousTurnProvider>(FindObjectsSortMode.None))
+            {
+                t.enabled = false;
+                Debug.Log($"[Bootstrap] Disabled ContinuousTurnProvider on '{t.gameObject.name}'.");
+            }
+            // Teleportation provider — disables the teleport action itself.
+            foreach (var t in FindObjectsByType<TeleportationProvider>(FindObjectsSortMode.None))
+            {
+                t.enabled = false;
+                Debug.Log($"[Bootstrap] Disabled TeleportationProvider on '{t.gameObject.name}'.");
+            }
+            // Deactivate any GameObjects named "Teleport*" — these are the ray interactors
+            // that draw the red arc when the thumbstick is pushed upward.
+            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (t.name.Contains("Teleport") || t.name.Contains("teleport"))
+                {
+                    t.gameObject.SetActive(false);
+                    Debug.Log($"[Bootstrap] Deactivated teleport object '{t.name}'.");
+                }
             }
         }
 

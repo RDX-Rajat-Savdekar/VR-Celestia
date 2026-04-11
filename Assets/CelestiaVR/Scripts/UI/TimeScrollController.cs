@@ -9,7 +9,8 @@ namespace CelestiaVR.UI
     /// Scrolls simulated time automatically and/or via VR thumbstick.
     ///
     /// In the editor / without a headset: time auto-scrolls at autoScrollHoursPerSecond.
-    /// On Quest: right thumbstick X scrubs time; grip = 24x multiplier.
+    /// On Quest: RIGHT thumbstick X scrubs time; right grip = 24x multiplier.
+    /// Left thumbstick is reserved for movement (ContinuousMoveProvider).
     /// </summary>
     public class TimeScrollController : MonoBehaviour
     {
@@ -87,18 +88,16 @@ namespace CelestiaVR.UI
 
         private float GetThumbstickX()
         {
+            // Right hand only — left thumbstick is reserved for locomotion movement.
             foreach (var d in _rightHand)
-                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.x;
-            foreach (var d in _leftHand)
                 if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.x;
             return 0f;
         }
 
         private bool GetGripHeld()
         {
+            // Right grip = fast mode. Left grip intentionally not used here.
             foreach (var d in _rightHand)
-                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool v) && v) return true;
-            foreach (var d in _leftHand)
                 if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool v) && v) return true;
             return false;
         }

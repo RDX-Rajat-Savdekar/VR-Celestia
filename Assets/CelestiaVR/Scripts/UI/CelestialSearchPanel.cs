@@ -184,6 +184,8 @@ namespace CelestiaVR.UI
 
         // ── Public API ────────────────────────────────────────────────────────────
 
+        public bool IsOpen => _isOpen;
+
         public void ToggleOpen()
         {
             if (_isOpen) Close(); else Open();
