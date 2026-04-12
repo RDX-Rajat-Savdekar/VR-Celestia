@@ -4,6 +4,7 @@ using CelestiaVR.Interaction;
 using CelestiaVR.Stars;
 using CelestiaVR.UI;
 using CelestiaVR.Constellations;
+using CelestiaVR.Island;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
@@ -25,6 +26,7 @@ namespace CelestiaVR.Core
             DisableGazeInteractor();
             DisableTurnAndTeleport();
             DisableXRInteractorVisuals();
+            DisableAffordanceSystem();
             DisableGazeDebugger();
             DisableLegacyConstellationRenderers();
             WireInteraction();
@@ -33,6 +35,7 @@ namespace CelestiaVR.Core
             EnsureDirectionalArrow();
             EnsureSearchSystem();
             EnsureInputManager();
+            EnsureFireplaceMiniGame();
 
             Debug.Log("[Bootstrap] Scene ready.");
         }
@@ -230,6 +233,24 @@ namespace CelestiaVR.Core
             }
         }
 
+        /// <summary>
+        /// Disables all XRI AffordanceSystem receivers/providers.
+        /// When NearFarInteractor is disabled its affordance state provider stops firing,
+        /// but the receivers still run and throw NullReferenceException in HandleTween.
+        /// Disabling every MonoBehaviour whose type name contains "Affordance" silences this.
+        /// </summary>
+        private void DisableAffordanceSystem()
+        {
+            foreach (var mb in FindObjectsByType<MonoBehaviour>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (mb == null) continue;
+                var fullName = mb.GetType().FullName;
+                if (fullName != null && fullName.Contains("Affordance"))
+                    mb.enabled = false;
+            }
+        }
+
         /// <summary>Disables GazeDebugger — a dev-only component that floods the console.</summary>
         private void DisableGazeDebugger()
         {
@@ -314,6 +335,16 @@ namespace CelestiaVR.Core
                 var go = new GameObject("[StargazingInputManager]");
                 go.AddComponent<StargazingInputManager>();
             }
+        }
+
+        private void EnsureFireplaceMiniGame()
+        {
+            if (FindFirstObjectByType<FireplaceBootstrap>() != null) return;
+
+            var go = new GameObject("[FireplaceBootstrap]");
+            go.AddComponent<FireplaceBootstrap>();
+            // islandAnchor left null → positions are treated as world-space coordinates directly.
+            // Assign islandAnchor in the Inspector if you want island-local offset coordinates.
         }
     }
 }
