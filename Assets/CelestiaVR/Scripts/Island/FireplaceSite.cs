@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Island
 {
@@ -25,7 +26,7 @@ namespace CelestiaVR.Island
 
         [Header("Site Zone")]
         [Tooltip("Radius within which a released stick is accepted.")]
-        public float snapRadius = 0.6f;
+        public float snapRadius = 1.0f;
 
         [Header("Appearance")]
         public Color  markerColor        = new Color(1f, 0.75f, 0.2f, 1f);
@@ -112,6 +113,7 @@ namespace CelestiaVR.Island
         {
             if (CurrentState != State.Built) return;
             CurrentState = State.Lit;
+            SoundManager.Instance?.Play(SoundEvent.FireIgnite, transform.position);
             Debug.Log("[FireplaceSite] Fire lit!");
 
             foreach (var ps in _fireSystems)
@@ -152,9 +154,14 @@ namespace CelestiaVR.Island
             foreach (var s in _sticks)
                 if (s != null) s.gameObject.SetActive(false);
 
-            // 3. Show fireplace model
+            // 3. Show fireplace model — destroy any Rigidbodies so it doesn't fall
+            //    (island GLB has no physics mesh; gravity would send it to the ocean floor)
             if (fireplaceModel != null)
-                fireplaceModel.SetActive(true); // prefab already has correct materials
+            {
+                foreach (var rb in fireplaceModel.GetComponentsInChildren<Rigidbody>())
+                    Destroy(rb);
+                fireplaceModel.SetActive(true);
+            }
 
             // 4. Hide ring
             if (_ringRenderer != null) _ringRenderer.enabled = false;

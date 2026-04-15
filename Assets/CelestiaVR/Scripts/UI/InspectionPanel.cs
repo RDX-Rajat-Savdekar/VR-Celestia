@@ -60,6 +60,7 @@ namespace CelestiaVR.UI
         private bool         _visible;
         private bool         _realScaleActive;
         private CelestialBody _currentBody;
+        private RawImage      _constellationArtImage;
 
         // Ray interaction (mirrors ControlPanel approach)
         private Transform    _rightControllerTransform;
@@ -184,6 +185,29 @@ namespace CelestiaVR.UI
 
             if (objectTypeText != null)
                 objectTypeText.text = FriendlyType(body);
+
+            // Constellation artwork image
+            if (_constellationArtImage != null)
+            {
+                if (body.bodyType == CelestialBodyType.Constellation)
+                {
+                    string pngName = body.objectName.ToLower().Replace(" ", "-");
+                    var tex = Resources.Load<Texture2D>("ConstellationArt/" + pngName);
+                    if (tex != null)
+                    {
+                        _constellationArtImage.texture = tex;
+                        _constellationArtImage.gameObject.SetActive(true);
+                    }
+                    else
+                    {
+                        _constellationArtImage.gameObject.SetActive(false);
+                    }
+                }
+                else
+                {
+                    _constellationArtImage.gameObject.SetActive(false);
+                }
+            }
 
             // stat1 — magnitude
             if (stat1Text != null)
@@ -444,9 +468,10 @@ namespace CelestiaVR.UI
 
             var cg = canvasGO.AddComponent<CanvasGroup>();
 
-            // 400 × 520 pixels at scale 0.001 = 0.40 m × 0.52 m physical panel
+            // 400 × 600 pixels at scale 0.001 = 0.40 m × 0.60 m physical panel
+            // Extra height accommodates the constellation art image (160 px)
             var rt = canvasGO.GetComponent<RectTransform>();
-            rt.sizeDelta  = new Vector2(400, 520);
+            rt.sizeDelta  = new Vector2(400, 600);
             rt.localScale = Vector3.one * 0.001f; // 1 px = 1 mm
 
             var scaler = canvasGO.AddComponent<CanvasScaler>();
@@ -522,6 +547,29 @@ namespace CelestiaVR.UI
             div2Img.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 1);
             var div2LE = div2GO.AddComponent<LayoutElement>();
             div2LE.preferredHeight = 1;
+
+            // Constellation artwork image — hidden for non-constellation bodies
+            var artGO = new GameObject("ConstellationArt");
+            artGO.transform.SetParent(layout.transform, false);
+            _constellationArtImage = artGO.AddComponent<RawImage>();
+            _constellationArtImage.color = new Color(0.85f, 0.92f, 1f, 0.92f);  // cool blue-white tint
+
+            // Additive blend so the black PNG background vanishes, matching the hologram quad material.
+            // SrcAlpha + One: bright art glows, black (alpha≈0) disappears against the panel background.
+            var artSh  = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            var artMat = new Material(artSh);
+            artMat.SetFloat("_Surface",  1f);  // Transparent
+            artMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            artMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);  // additive dest
+            artMat.SetFloat("_ZWrite",   0f);
+            artMat.SetFloat("_Cull",     0f);
+            artMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            artMat.renderQueue = 3000;
+            _constellationArtImage.material = artMat;
+
+            var artLE = artGO.AddComponent<LayoutElement>();
+            artLE.preferredHeight = 160;
+            artGO.SetActive(false); // shown only for constellations
 
             descriptionText = MakeTMP("Desc", 17, new Color(0.8f, 0.85f, 0.95f, 0.8f), TextAlignmentOptions.TopLeft);
             descriptionText.textWrappingMode = TMPro.TextWrappingModes.Normal;

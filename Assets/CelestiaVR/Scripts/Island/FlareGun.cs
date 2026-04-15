@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Island
 {
@@ -104,6 +105,8 @@ namespace CelestiaVR.Island
 
         private void Fire()
         {
+            SoundManager.Instance?.Play(SoundEvent.FlareShot, muzzlePoint.position);
+
             // Activate a copy of the prototype
             var flareGO = Instantiate(flareProjectilePrefab, muzzlePoint.position, muzzlePoint.rotation);
             flareGO.SetActive(true);

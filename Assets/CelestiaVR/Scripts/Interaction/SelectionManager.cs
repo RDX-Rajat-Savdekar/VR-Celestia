@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using CelestiaVR.Core;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Interaction
 {
@@ -92,6 +93,7 @@ namespace CelestiaVR.Interaction
         private void HandleDismissPerformed(InputAction.CallbackContext ctx)
         {
             if (_selectedBody == null) return;
+            SoundManager.Instance?.Play(SoundEvent.Deselect);
             OnDeselect?.Invoke();
             _selectedBody = null;
         }
@@ -125,6 +127,9 @@ namespace CelestiaVR.Interaction
             if (target != null)
             {
                 _selectedBody = target;
+                // Only play select sound here for trigger-based selection.
+                // Dwell-based selection already plays the sound in DwellSelector.
+                SoundManager.Instance?.Play(SoundEvent.Select, target.transform.position);
                 OnObjectSelected?.Invoke(target);
             }
         }

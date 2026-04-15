@@ -5,6 +5,7 @@ using CelestiaVR.Stars;
 using CelestiaVR.UI;
 using CelestiaVR.Constellations;
 using CelestiaVR.Island;
+using CelestiaVR.Audio;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
@@ -35,6 +36,7 @@ namespace CelestiaVR.Core
             EnsureDirectionalArrow();
             EnsureSearchSystem();
             EnsureInputManager();
+            EnsureSoundManager();
             EnsureFireplaceMiniGame();
 
             Debug.Log("[Bootstrap] Scene ready.");
@@ -201,13 +203,10 @@ namespace CelestiaVR.Core
                 c.enabled = false;
             }
 
-            // Disable the Near-Far Interactor (XRI 3 combines near+far in one component)
-            foreach (var c in FindObjectsByType<
-                UnityEngine.XR.Interaction.Toolkit.Interactors.NearFarInteractor>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None))
-            {
-                c.enabled = false;
-            }
+            // NearFarInteractor is intentionally left ENABLED — its near (physical) grab mode
+            // is required for XRGrabInteractable objects (sticks, flare gun).
+            // The ray line visual and reticle are already suppressed by the loops above,
+            // so no visual artifacts appear even with the interactor active.
 
             // Disable any remaining LineRenderers on controller child GOs whose name
             // suggests they are ray/cursor visuals (catches custom visuals added by XRI3 template)
@@ -335,6 +334,13 @@ namespace CelestiaVR.Core
                 var go = new GameObject("[StargazingInputManager]");
                 go.AddComponent<StargazingInputManager>();
             }
+        }
+
+        private void EnsureSoundManager()
+        {
+            if (FindFirstObjectByType<SoundManager>() != null) return;
+            var go = new GameObject("[SoundManager]");
+            go.AddComponent<SoundManager>();
         }
 
         private void EnsureFireplaceMiniGame()

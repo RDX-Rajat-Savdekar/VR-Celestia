@@ -38,7 +38,7 @@ namespace CelestiaVR.Island
 
         [Header("Positions (world-space — leave islandAnchor empty to use directly)")]
         public Vector3 fireplaceOffset = new Vector3(4.11f, 0.144f, -0.16f);
-        public Vector3 flareGunOffset  = new Vector3(0.8f,  0.6f,   0.3f);
+        public Vector3 flareGunOffset  = new Vector3(0f,    0.5f,   0f);
 
         // Sticks scattered around the fireplace in world space (near To_Place_Fireplace).
         // These are overridden at runtime if To_Place_Fireplace is found.
@@ -96,11 +96,27 @@ namespace CelestiaVR.Island
 #endif
         }
 
+        /// <summary>
+        /// Runtime fallback for on-device builds where AssetDatabase is unavailable.
+        /// Prefabs must be placed in Assets/Resources/FirePlaceEnv/ for Resources.Load to find them.
+        /// </summary>
+        private void TryLoadFromResources()
+        {
+            const string root = "FirePlaceEnv/";
+            if (fireplaceGlb == null) fireplaceGlb = Resources.Load<GameObject>(root + "small_fire_place");
+            if (stickGlb     == null) stickGlb     = Resources.Load<GameObject>(root + "lowpoly_stick_-_01");
+            if (flareGunGlb  == null) flareGunGlb  = Resources.Load<GameObject>(root + "flare_gun");
+        }
+
         private void Start()
         {
             // Idempotent — StargazingSceneBootstrap already guards before creating us,
             // but double-check in case Bootstrap is re-run or manually placed.
             if (FindFirstObjectByType<FireplaceSite>() != null) return;
+
+            // On device, AssetDatabase is unavailable so OnValidate never ran — fall back to
+            // Resources.Load. Prefabs must live in Assets/Resources/FirePlaceEnv/ for this to work.
+            TryLoadFromResources();
 
             if (!ValidateGLBs()) return;
 
@@ -137,6 +153,12 @@ namespace CelestiaVR.Island
             if (fireplaceGlb != null)
             {
                 var fp = Instantiate(fireplaceGlb, siteGO.transform);
+                // Reset local transform so the model sits exactly at the site position
+                // regardless of any root offset baked into the GLB on export.
+                fp.transform.localPosition = Vector3.zero;
+                fp.transform.localRotation = Quaternion.identity;
+                // Fix glTF shaders → URP Lit so the model renders on Quest (Android)
+                FireplaceSite.FixGLBShaders(fp, 0.5f);
                 fp.SetActive(false);
                 _site.fireplaceModel = fp;
             }
@@ -156,7 +178,8 @@ namespace CelestiaVR.Island
                 stickGO.transform.rotation = Quaternion.Euler(
                     Random.Range(-10f, 10f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
 
-                // Prefab already has correct materials — no shader fix needed
+                // Fix glTF shaders → URP Lit so sticks render on Quest (Android)
+                FireplaceSite.FixGLBShaders(stickGO, 0.4f);
 
                 // Physics — no gravity so sticks stay at their spawn position.
                 // The island GLB has no physics mesh, so gravity would send them to the ocean floor.
@@ -200,17 +223,19 @@ namespace CelestiaVR.Island
                 ? _site.transform.position + flareGunOffset
                 : AnchorPos(fireplaceOffset + flareGunOffset);
 
-            // Prefab already has correct materials — no shader fix needed
+            // Fix glTF shaders → URP Lit so the gun renders on Quest (Android)
+            FireplaceSite.FixGLBShaders(gunGO, 0.3f);
 
-            // Physics
+            // Physics — no gravity so it floats at spawn height (island has no physics mesh)
             var rb                = gunGO.AddComponent<Rigidbody>();
             rb.mass               = 0.6f;
             rb.linearDamping      = 0.4f;
             rb.angularDamping     = 0.8f;
+            rb.useGravity         = false;
 
-            // Collider
+            // Collider — generous size so the hand can grab it easily
             var col               = gunGO.AddComponent<BoxCollider>();
-            col.size              = new Vector3(0.06f, 0.12f, 0.22f);
+            col.size              = new Vector3(0.12f, 0.18f, 0.35f);
             col.center            = new Vector3(0f, 0.04f, 0.03f);
 
             // XR Grab

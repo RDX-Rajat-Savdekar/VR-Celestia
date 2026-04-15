@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
 using CelestiaVR.Core;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.UI
 {
@@ -33,6 +34,8 @@ namespace CelestiaVR.UI
         public float thumbstickDeadzone = 0.15f;
 
         private float _momentumHoursPerSec = 0f;
+        private float _scrollSoundTimer    = 0f;
+        private float _moveSoundTimer      = 0f;
         private List<InputDevice> _rightHand = new List<InputDevice>();
         private List<InputDevice> _leftHand  = new List<InputDevice>();
 
@@ -55,15 +58,39 @@ namespace CelestiaVR.UI
             {
                 float target = thumbstickX * hoursPerSecondAtFullTilt * (gripHeld ? gripSpeedMultiplier : 1f);
                 _momentumHoursPerSec = Mathf.Lerp(_momentumHoursPerSec, target, Time.deltaTime * 10f);
+
+                _scrollSoundTimer -= Time.deltaTime;
+                if (_scrollSoundTimer <= 0f)
+                {
+                    SoundManager.Instance?.Play(SoundEvent.TimeScroll);
+                    _scrollSoundTimer = 0.12f; // max ~8 ticks/sec
+                }
             }
             else
             {
                 // No thumbstick — hold at auto-scroll rate (no decay)
                 _momentumHoursPerSec = autoScrollHoursPerSecond;
+                _scrollSoundTimer = 0f; // reset so next scroll starts immediately
             }
 
             if (_momentumHoursPerSec != 0f)
                 SkyManager.Instance.OffsetSimulatedTime(_momentumHoursPerSec * 3600.0 * Time.deltaTime);
+
+            // Movement sound — left thumbstick Y (forward / back locomotion)
+            float moveY = GetLeftThumbstickY();
+            if (Mathf.Abs(moveY) > thumbstickDeadzone)
+            {
+                _moveSoundTimer -= Time.deltaTime;
+                if (_moveSoundTimer <= 0f)
+                {
+                    SoundManager.Instance?.Play(SoundEvent.Movement);
+                    _moveSoundTimer = 0.30f; // ~3 ticks/sec — subtle footstep rhythm
+                }
+            }
+            else
+            {
+                _moveSoundTimer = 0f;
+            }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
@@ -91,6 +118,13 @@ namespace CelestiaVR.UI
             // Right hand only — left thumbstick is reserved for locomotion movement.
             foreach (var d in _rightHand)
                 if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.x;
+            return 0f;
+        }
+
+        private float GetLeftThumbstickY()
+        {
+            foreach (var d in _leftHand)
+                if (d.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primary2DAxis, out Vector2 a)) return a.y;
             return 0f;
         }
 

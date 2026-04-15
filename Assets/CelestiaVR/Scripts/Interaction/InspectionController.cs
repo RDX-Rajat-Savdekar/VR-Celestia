@@ -3,6 +3,7 @@ using UnityEngine;
 using CelestiaVR.Core;
 using CelestiaVR.UI;
 using CelestiaVR.Planets;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Interaction
 {
@@ -121,7 +122,7 @@ namespace CelestiaVR.Interaction
 
         public void StartInspection(CelestialBody body)
         {
-
+            SoundManager.Instance?.Play(SoundEvent.InspectionOpen, body.transform.position);
             if (_hologramCopy != null) DismissHologram();
 
             _inspectedBody = body;
@@ -134,6 +135,7 @@ namespace CelestiaVR.Interaction
         public void ExitInspection()
         {
             if (_inspectedBody == null) return;
+            SoundManager.Instance?.Play(SoundEvent.InspectionClose);
 
             _inspectedBody.isInspecting = false;
             _inspectedBody = null;
@@ -165,7 +167,11 @@ namespace CelestiaVR.Interaction
             _hologramCopy.transform.position = Vector3.Lerp(
                 _hologramCopy.transform.position, target, Time.deltaTime * 3f);
 
-            if (_inspectedBody != null && _inspectedBody.bodyType == CelestialBodyType.DeepSkyObject)
+            bool billboard = _inspectedBody != null &&
+                (_inspectedBody.bodyType == CelestialBodyType.DeepSkyObject ||
+                 _inspectedBody.bodyType == CelestialBodyType.Constellation);
+
+            if (billboard)
             {
                 _hologramCopy.transform.rotation = Quaternion.LookRotation(
                     _hologramCopy.transform.position - _xrCamera.transform.position);
@@ -180,6 +186,37 @@ namespace CelestiaVR.Interaction
 
         private IEnumerator AnimateIn(CelestialBody body)
         {
+            Vector3 finalScale;
+
+            if (body.bodyType == CelestialBodyType.Constellation)
+            {
+                // Build a glowing quad showing the constellation's artwork PNG
+                _hologramCopy = BuildConstellationQuad(body);
+                finalScale    = Vector3.one * 0.38f; // ~38 cm square in world space
+                _hologramNormFactor = 1f;
+                _defaultHologramScale = finalScale;
+
+                Vector3 constSpawnPos = GetInspectionWorldPosition();
+                _hologramCopy.transform.position   = constSpawnPos;
+                _hologramCopy.transform.localScale = Vector3.zero;
+                _hologramCopy.transform.rotation   = Quaternion.LookRotation(
+                    constSpawnPos - _xrCamera.transform.position);
+
+                float constElapsed = 0f;
+                while (constElapsed < animationDuration)
+                {
+                    constElapsed += Time.deltaTime;
+                    float ct = easeCurve.Evaluate(Mathf.Clamp01(constElapsed / animationDuration));
+                    _hologramCopy.transform.position   = Vector3.Lerp(constSpawnPos, GetInspectionWorldPosition(), ct);
+                    _hologramCopy.transform.localScale = Vector3.Lerp(Vector3.zero, finalScale, ct);
+                    constSpawnPos = _hologramCopy.transform.position;
+                    yield return null;
+                }
+                _hologramCopy.transform.localScale = finalScale;
+                inspectionPanel?.Show(body);
+                yield break;
+            }
+
             // Use the body's dedicated inspection prefab if available (e.g. the textured
             // sun or planet model); otherwise fall back to cloning the sky GameObject.
             GameObject source = body.inspectionPrefab != null ? body.inspectionPrefab : body.gameObject;
@@ -192,7 +229,6 @@ namespace CelestiaVR.Interaction
                 Destroy(col);
 
             // Scale the hologram by physical size relative to Earth, not by sky representation.
-            Vector3 finalScale;
             if (body.bodyType == CelestialBodyType.DeepSkyObject)
             {
                 finalScale = Vector3.one * 0.30f;
@@ -309,6 +345,46 @@ namespace CelestiaVR.Interaction
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Creates a world-space quad (plane) whose texture is the constellation's artwork PNG
+        /// loaded from Resources/ConstellationArt/{name}.png.
+        /// Falls back to a faint untextured quad when the PNG is not found.
+        /// </summary>
+        private static GameObject BuildConstellationQuad(CelestialBody body)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = $"{body.objectName}_Hologram";
+            Object.Destroy(go.GetComponent<MeshCollider>());
+
+            string pngName = body.objectName.ToLower().Replace(" ", "-");
+            var tex = Resources.Load<Texture2D>("ConstellationArt/" + pngName);
+
+            var mr  = go.GetComponent<MeshRenderer>();
+            // Match StellariumLoader.BuildArtMat() exactly:
+            // SrcAlpha + dest*One — black pixels (alpha≈0) vanish, bright art glows.
+            var sh  = Shader.Find("Universal Render Pipeline/Unlit")
+                   ?? Shader.Find("Sprites/Default");
+            var mat = new Material(sh);
+            mat.SetFloat("_Surface",  1f);   // Transparent
+            mat.SetFloat("_Blend",    0f);   // manual below
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One); // additive dest
+            mat.SetFloat("_ZWrite",   0f);
+            mat.SetFloat("_Cull",     0f);   // double-sided
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = 3000;
+            if (tex != null)
+            {
+                mat.SetTexture("_BaseMap", tex);
+                mat.mainTexture = tex;
+            }
+            mat.SetColor("_BaseColor", new Color(0.85f, 0.92f, 1f, 1f));
+            mr.sharedMaterial = mat;
+
+            return go;
+        }
 
         private Vector3 GetInspectionWorldPosition()
         {

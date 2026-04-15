@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using CelestiaVR.Core;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Interaction
 {
@@ -106,7 +107,10 @@ namespace CelestiaVR.Interaction
                 _dwellAccumulator = 0f;
 
                 if (_currentTarget != null)
+                {
                     OnGazeEnter?.Invoke(_currentTarget);
+                    SoundManager.Instance?.Play(SoundEvent.GazeEnter, _currentTarget.transform.position);
+                }
             }
 
             // 5. Dwell accumulation
@@ -118,6 +122,7 @@ namespace CelestiaVR.Interaction
 
                 if (_dwellAccumulator >= dwellTime)
                 {
+                    SoundManager.Instance?.Play(SoundEvent.Select, _currentTarget.transform.position);
                     OnDwellSelect?.Invoke(_currentTarget);
                     _dwellAccumulator = 0f; // prevent repeat firing
                 }

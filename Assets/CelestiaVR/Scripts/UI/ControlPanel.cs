@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 using CelestiaVR.Core;
 using CelestiaVR.Interaction;
 using CelestiaVR.Constellations;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.UI
 {
@@ -65,6 +66,7 @@ namespace CelestiaVR.UI
         {
             Close, SetObserveMode, SetInspectMode,
             ToggleConstellationLines, ToggleConstellationArt, TogglePlanetLabels,
+            ToggleSound,
             SelectSearchItem,
         }
 
@@ -85,7 +87,7 @@ namespace CelestiaVR.UI
 
         private GameObject   _panelRoot;
         private Image        _observeBtnBg, _inspectBtnBg;
-        private Image        _linesDot, _artDot, _labelsDot;
+        private Image        _linesDot, _artDot, _labelsDot, _soundDot;
         private TMP_InputField _searchInput;
         private RectTransform  _contentRT;
         private float _scrollOffset, _maxScroll;
@@ -191,6 +193,7 @@ namespace CelestiaVR.UI
         {
             if (_panelRoot == null) return;
             _isOpen = true;
+            SoundManager.Instance?.Play(SoundEvent.PanelOpen);
 
             // Snap to camera
             _panelRoot.transform.position =
@@ -216,6 +219,7 @@ namespace CelestiaVR.UI
         public void Close()
         {
             _isOpen = false;
+            SoundManager.Instance?.Play(SoundEvent.PanelClose);
             if (_panelRoot != null) _panelRoot.SetActive(false);
             ClearHover();
             if (_rayLine != null) _rayLine.enabled = false;
@@ -257,7 +261,7 @@ namespace CelestiaVR.UI
             // Fixed canvas height
             float staticH = 40f + 2f               // header + div
                           + 26f + 42f + 2f          // mode label + buttons + div
-                          + 26f + 32f*3 + 2f        // visibility label + 3 toggles + div
+                          + 26f + 32f*4 + 2f        // visibility label + 4 toggles + div
                           + 26f + 36f + ViewportH   // search label + input + list
                           + 14f;                    // bottom pad
 
@@ -346,6 +350,7 @@ namespace CelestiaVR.UI
             _linesDot  = BuildToggleRow(L, "Lines",  "Constellation Lines",  ButtonAction.ToggleConstellationLines);
             _artDot    = BuildToggleRow(L, "Art",    "Constellation Art",    ButtonAction.ToggleConstellationArt);
             _labelsDot = BuildToggleRow(L, "Labels", "Planet Labels",        ButtonAction.TogglePlanetLabels);
+            _soundDot  = BuildToggleRow(L, "Sound",  "Sound Effects",        ButtonAction.ToggleSound);
 
             AddDiv(L);
 
@@ -561,6 +566,10 @@ namespace CelestiaVR.UI
             var b = _buttons[index];
             ClearHover();
 
+            // Play a click for all buttons except ToggleSound (which manages its own mute state)
+            if (b.action != ButtonAction.ToggleSound)
+                SoundManager.Instance?.Play(SoundEvent.ButtonPress);
+
             switch (b.action)
             {
                 case ButtonAction.Close:
@@ -589,6 +598,11 @@ namespace CelestiaVR.UI
                     { SkyLabelManager.Instance.SetPlanetLabelsVisible(!SkyLabelManager.Instance.ArePlanetLabelsVisible); RefreshToggleDots(); }
                     break;
 
+                case ButtonAction.ToggleSound:
+                    SoundManager.Instance?.ToggleMute();
+                    RefreshToggleDots();
+                    break;
+
                 case ButtonAction.SelectSearchItem:
                     if (b.searchTarget != null)
                     { DirectionalArrow.Instance?.SetTarget(b.searchTarget); Close(); }
@@ -613,6 +627,7 @@ namespace CelestiaVR.UI
             if (_linesDot  != null) _linesDot.color  = (ldr  != null && ldr.AreLinesVisible) ? ColToggleOn : ColToggleOff;
             if (_artDot    != null) _artDot.color    = (ldr  != null && ldr.IsArtVisible)    ? ColToggleOn : ColToggleOff;
             if (_labelsDot != null) _labelsDot.color = (lmgr != null && lmgr.ArePlanetLabelsVisible) ? ColToggleOn : ColToggleOff;
+            if (_soundDot  != null) _soundDot.color  = (SoundManager.Instance != null && !SoundManager.Instance.IsMuted) ? ColToggleOn : ColToggleOff;
         }
 
         // ── Search filter ─────────────────────────────────────────────────────────

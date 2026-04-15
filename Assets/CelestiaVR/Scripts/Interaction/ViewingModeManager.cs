@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Interaction
 {
@@ -107,6 +108,7 @@ namespace CelestiaVR.Interaction
         {
             if (mode == CurrentMode) return;
             CurrentMode = mode;
+            SoundManager.Instance?.Play(SoundEvent.ModeSwitch);
             RefreshBadge();
             OnModeChanged?.Invoke(mode);
         }

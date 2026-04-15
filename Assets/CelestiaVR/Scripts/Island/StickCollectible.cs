@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using CelestiaVR.Audio;
 
 namespace CelestiaVR.Island
 {
@@ -41,13 +42,17 @@ namespace CelestiaVR.Island
         private void Start()
         {
             targetSite?.RegisterStick(this);
+            _grab.selectEntered.AddListener(OnGrabbed);
             _grab.selectExited.AddListener(OnReleased);
         }
 
         private void OnDestroy()
         {
             if (_grab != null)
+            {
+                _grab.selectEntered.RemoveListener(OnGrabbed);
                 _grab.selectExited.RemoveListener(OnReleased);
+            }
         }
 
         private void Update()
@@ -64,6 +69,11 @@ namespace CelestiaVR.Island
         }
 
         // ── Handlers ──────────────────────────────────────────────────────────────
+
+        private void OnGrabbed(SelectEnterEventArgs _)
+        {
+            SoundManager.Instance?.Play(SoundEvent.StickPickup, transform.position);
+        }
 
         private void OnReleased(SelectExitEventArgs _)
         {
@@ -82,12 +92,17 @@ namespace CelestiaVR.Island
         private void Deposit()
         {
             _deposited = true;
+            SoundManager.Instance?.Play(SoundEvent.StickDeposit, transform.position);
 
             // Lock in place
             _grab.enabled           = false;
             _rb.isKinematic         = true;
             _rb.linearVelocity      = Vector3.zero;
             _rb.angularVelocity     = Vector3.zero;
+
+            // Disable all colliders so later sticks don't collide with this one and spin
+            foreach (var col in GetComponentsInChildren<Collider>())
+                col.enabled = false;
 
             // Snap to pile position
             transform.position = targetSite.transform.position + snapOffset;
