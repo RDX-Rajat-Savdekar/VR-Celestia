@@ -16,9 +16,9 @@ namespace CelestiaVR.Interaction
     /// Left  thumbstick click    → Viewing mode toggle (ViewingModeManager)
     /// Left  grip                → Time scroll fast (handled by TimeScrollController)
     ///
-    /// Right A (primaryButton)   → (reserved — could toggle constellation lines)
+    /// Right A (primaryButton)   → Select / call hologram (SelectionManager _buttonSelectAction)
     /// Right B (secondaryButton) → Dismiss inspection (SelectionManager dismissAction)
-    /// Right trigger             → Select / inspect (SelectionManager selectAction)
+    /// Right trigger             → Select / inspect (SelectionManager selectAction — Inspector)
     /// Right thumbstick X        → Time scroll  (handled by TimeScrollController)
     /// Right thumbstick click    → Viewing mode toggle (ViewingModeManager)
     /// ─────────────────────────────────────────────────────────────

@@ -728,7 +728,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cec908cc861e1441a85ea6cf21fb63c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Interaction.SelectionManager
-  selectAction: {fileID: 187161793506945269, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  selectAction: {fileID: 0}
   dismissAction: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   rayOrigin: {fileID: 1373153107}
   maxRayDistance: 600

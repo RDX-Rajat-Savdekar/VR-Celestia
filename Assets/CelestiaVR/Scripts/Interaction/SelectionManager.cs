@@ -39,6 +39,9 @@ namespace CelestiaVR.Interaction
         private CelestialBody _selectedBody;
         private DwellSelector _dwellSelector;
 
+        // Programmatic button binding — Right A = select/inspect hologram
+        private InputAction _buttonSelectAction;
+
         private void Awake()
         {
             _dwellSelector = FindFirstObjectByType<DwellSelector>();
@@ -52,10 +55,22 @@ namespace CelestiaVR.Interaction
             }
         }
 
+        private void Start()
+        {
+            // Right A button → call hologram (select what you're currently gazing at)
+            _buttonSelectAction = new InputAction("ButtonSelect", InputActionType.Button);
+            _buttonSelectAction.AddBinding("<XRController>{RightHand}/primaryButton"); // A on Quest
+            _buttonSelectAction.performed += HandleSelectPerformed;
+            _buttonSelectAction.Enable();
+        }
+
         private void OnDestroy()
         {
             if (_dwellSelector != null)
                 _dwellSelector.OnDwellSelect -= HandleDwellSelect;
+
+            _buttonSelectAction?.Disable();
+            _buttonSelectAction?.Dispose();
         }
 
         private void HandleDwellSelect(CelestialBody body)
