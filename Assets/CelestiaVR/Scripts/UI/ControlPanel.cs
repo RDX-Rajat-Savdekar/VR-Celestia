@@ -67,6 +67,7 @@ namespace CelestiaVR.UI
             Close, SetObserveMode, SetInspectMode,
             ToggleConstellationLines, ToggleConstellationArt, TogglePlanetLabels,
             ToggleSound,
+            ToggleDwellStars, ToggleDwellPlanets, ToggleDwellDeepSky,
             SelectSearchItem,
         }
 
@@ -88,6 +89,7 @@ namespace CelestiaVR.UI
         private GameObject   _panelRoot;
         private Image        _observeBtnBg, _inspectBtnBg;
         private Image        _linesDot, _artDot, _labelsDot, _soundDot;
+        private Image        _dwellStarsDot, _dwellPlanetsDot, _dwellDeepSkyDot;
         private TMP_InputField _searchInput;
         private RectTransform  _contentRT;
         private float _scrollOffset, _maxScroll;
@@ -262,6 +264,7 @@ namespace CelestiaVR.UI
             float staticH = 40f + 2f               // header + div
                           + 26f + 42f + 2f          // mode label + buttons + div
                           + 26f + 32f*4 + 2f        // visibility label + 4 toggles + div
+                          + 26f + 32f*3 + 2f        // dwell label + 3 toggles + div
                           + 26f + 36f + ViewportH   // search label + input + list
                           + 14f;                    // bottom pad
 
@@ -351,6 +354,16 @@ namespace CelestiaVR.UI
             _artDot    = BuildToggleRow(L, "Art",    "Constellation Art",    ButtonAction.ToggleConstellationArt);
             _labelsDot = BuildToggleRow(L, "Labels", "Planet Labels",        ButtonAction.TogglePlanetLabels);
             _soundDot  = BuildToggleRow(L, "Sound",  "Sound Effects",        ButtonAction.ToggleSound);
+
+            AddDiv(L);
+
+            // ── DWELL FILTER ──────────────────────────────────────────────────────
+            AddRow(L, "DwellLbl", 26f, row =>
+                MkLabel(UIChild(row,"L").gameObject, "DWELL SELECT", 12f, ColSection));
+
+            _dwellStarsDot    = BuildToggleRow(L, "DwStar",  "Stars",       ButtonAction.ToggleDwellStars);
+            _dwellPlanetsDot  = BuildToggleRow(L, "DwPlanet","Planets",     ButtonAction.ToggleDwellPlanets);
+            _dwellDeepSkyDot  = BuildToggleRow(L, "DwDSO",   "Galaxies / DSO", ButtonAction.ToggleDwellDeepSky);
 
             AddDiv(L);
 
@@ -603,6 +616,21 @@ namespace CelestiaVR.UI
                     RefreshToggleDots();
                     break;
 
+                case ButtonAction.ToggleDwellStars:
+                case ButtonAction.ToggleDwellPlanets:
+                case ButtonAction.ToggleDwellDeepSky:
+                {
+                    var dwell = FindFirstObjectByType<DwellSelector>();
+                    if (dwell != null)
+                    {
+                        if (b.action == ButtonAction.ToggleDwellStars)    dwell.dwellStars   = !dwell.dwellStars;
+                        if (b.action == ButtonAction.ToggleDwellPlanets)  dwell.dwellPlanets = !dwell.dwellPlanets;
+                        if (b.action == ButtonAction.ToggleDwellDeepSky)  dwell.dwellDeepSky = !dwell.dwellDeepSky;
+                    }
+                    RefreshToggleDots();
+                    break;
+                }
+
                 case ButtonAction.SelectSearchItem:
                     if (b.searchTarget != null)
                     { DirectionalArrow.Instance?.SetTarget(b.searchTarget); Close(); }
@@ -622,12 +650,16 @@ namespace CelestiaVR.UI
 
         private void RefreshToggleDots()
         {
-            var ldr  = StellariumLoader.Instance;
-            var lmgr = SkyLabelManager.Instance;
+            var ldr   = StellariumLoader.Instance;
+            var lmgr  = SkyLabelManager.Instance;
+            var dwell = FindFirstObjectByType<DwellSelector>();
             if (_linesDot  != null) _linesDot.color  = (ldr  != null && ldr.AreLinesVisible) ? ColToggleOn : ColToggleOff;
             if (_artDot    != null) _artDot.color    = (ldr  != null && ldr.IsArtVisible)    ? ColToggleOn : ColToggleOff;
             if (_labelsDot != null) _labelsDot.color = (lmgr != null && lmgr.ArePlanetLabelsVisible) ? ColToggleOn : ColToggleOff;
             if (_soundDot  != null) _soundDot.color  = (SoundManager.Instance != null && !SoundManager.Instance.IsMuted) ? ColToggleOn : ColToggleOff;
+            if (_dwellStarsDot   != null) _dwellStarsDot.color   = (dwell != null && dwell.dwellStars)   ? ColToggleOn : ColToggleOff;
+            if (_dwellPlanetsDot != null) _dwellPlanetsDot.color = (dwell != null && dwell.dwellPlanets) ? ColToggleOn : ColToggleOff;
+            if (_dwellDeepSkyDot != null) _dwellDeepSkyDot.color = (dwell != null && dwell.dwellDeepSky) ? ColToggleOn : ColToggleOff;
         }
 
         // ── Search filter ─────────────────────────────────────────────────────────

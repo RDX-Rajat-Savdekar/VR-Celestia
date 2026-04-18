@@ -71,6 +71,7 @@ namespace CelestiaVR.Interaction
         // For simple spheres: factor = 1 (localScale == world diameter).
         // For prefab meshes: factor = 1 / meshBoundsSize (mesh is N units wide; localScale N = N-metre world size).
         private float _hologramNormFactor = 1f;
+        private bool  _hologramIsBillboard = false;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -167,9 +168,10 @@ namespace CelestiaVR.Interaction
             _hologramCopy.transform.position = Vector3.Lerp(
                 _hologramCopy.transform.position, target, Time.deltaTime * 3f);
 
-            bool billboard = _inspectedBody != null &&
-                (_inspectedBody.bodyType == CelestialBodyType.DeepSkyObject ||
-                 _inspectedBody.bodyType == CelestialBodyType.Constellation);
+            bool billboard = _hologramIsBillboard ||
+                (_inspectedBody != null &&
+                 (_inspectedBody.bodyType == CelestialBodyType.DeepSkyObject ||
+                  _inspectedBody.bodyType == CelestialBodyType.Constellation));
 
             if (billboard)
             {
@@ -188,6 +190,8 @@ namespace CelestiaVR.Interaction
         {
             Vector3 finalScale;
 
+            _hologramIsBillboard = false;
+
             if (body.bodyType == CelestialBodyType.Constellation)
             {
                 // Build a glowing quad showing the constellation's artwork PNG
@@ -195,6 +199,7 @@ namespace CelestiaVR.Interaction
                 finalScale    = Vector3.one * 0.38f; // ~38 cm square in world space
                 _hologramNormFactor = 1f;
                 _defaultHologramScale = finalScale;
+                _hologramIsBillboard = true;
 
                 Vector3 constSpawnPos = GetInspectionWorldPosition();
                 _hologramCopy.transform.position   = constSpawnPos;
@@ -217,10 +222,50 @@ namespace CelestiaVR.Interaction
                 yield break;
             }
 
-            // Use the body's dedicated inspection prefab if available (e.g. the textured
-            // sun or planet model); otherwise fall back to cloning the sky GameObject.
-            GameObject source = body.inspectionPrefab != null ? body.inspectionPrefab : body.gameObject;
-            _hologramCopy = Instantiate(source);
+            // Stars: check for per-star photo first, fall back to SGT animated sphere.
+            // DSOs: SGT Galaxy/Nebula shader. Planets/moons: existing Instantiate path.
+            if (body.bodyType == CelestialBodyType.Star)
+            {
+                string starImgKey = body.objectName.ToLower().Replace(" ", "-");
+                var starTex = Resources.Load<Texture2D>("StarImages/" + starImgKey);
+                if (starTex != null)
+                {
+                    // Show as a billboard photo quad (same flow as constellation artwork)
+                    _hologramCopy = BuildStarPhotoHologram(body, starTex);
+                    finalScale    = Vector3.one * 0.38f;
+                    _hologramNormFactor   = 1f;
+                    _defaultHologramScale = finalScale;
+                    _hologramIsBillboard  = true;
+
+                    Vector3 starSpawnPos = GetInspectionWorldPosition();
+                    _hologramCopy.transform.position   = starSpawnPos;
+                    _hologramCopy.transform.localScale = Vector3.zero;
+                    _hologramCopy.transform.rotation   = Quaternion.LookRotation(
+                        starSpawnPos - _xrCamera.transform.position);
+
+                    float starElapsed = 0f;
+                    while (starElapsed < animationDuration)
+                    {
+                        starElapsed += Time.deltaTime;
+                        float st = easeCurve.Evaluate(Mathf.Clamp01(starElapsed / animationDuration));
+                        _hologramCopy.transform.position   = Vector3.Lerp(starSpawnPos, GetInspectionWorldPosition(), st);
+                        _hologramCopy.transform.localScale = Vector3.Lerp(Vector3.zero, finalScale, st);
+                        starSpawnPos = _hologramCopy.transform.position;
+                        yield return null;
+                    }
+                    _hologramCopy.transform.localScale = finalScale;
+                    inspectionPanel?.Show(body);
+                    yield break;
+                }
+                _hologramCopy = BuildSgtStarHologram(body);
+            }
+            else if (body.bodyType == CelestialBodyType.DeepSkyObject && body.inspectionPrefab == null)
+                _hologramCopy = BuildSgtDSOHologram(body);
+            else
+            {
+                GameObject source = body.inspectionPrefab != null ? body.inspectionPrefab : body.gameObject;
+                _hologramCopy = Instantiate(source);
+            }
             _hologramCopy.name = $"{body.objectName}_Hologram";
 
             var copyBody = _hologramCopy.GetComponent<CelestialBody>();
@@ -357,7 +402,11 @@ namespace CelestiaVR.Interaction
             go.name = $"{body.objectName}_Hologram";
             Object.Destroy(go.GetComponent<MeshCollider>());
 
-            string pngName = body.objectName.ToLower().Replace(" ", "-");
+            // dsoSubType holds the Latin PNG name stored at marker creation (e.g. "aquila").
+            // Fall back to the name-derived string for any legacy markers without it.
+            string pngName = !string.IsNullOrEmpty(body.dsoSubType)
+                ? body.dsoSubType
+                : body.objectName.ToLower().Replace(" ", "-");
             var tex = Resources.Load<Texture2D>("ConstellationArt/" + pngName);
 
             var mr  = go.GetComponent<MeshRenderer>();
@@ -382,6 +431,155 @@ namespace CelestiaVR.Interaction
             }
             mat.SetColor("_BaseColor", new Color(0.85f, 0.92f, 1f, 1f));
             mr.sharedMaterial = mat;
+
+            return go;
+        }
+
+        /// <summary>
+        /// Creates a billboard quad showing a photographic image of a named star.
+        /// Displayed when Resources/StarImages/{starname}.jpg exists.
+        /// </summary>
+        private static GameObject BuildStarPhotoHologram(CelestialBody body, Texture2D tex)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = $"{body.objectName}_Hologram";
+            Object.Destroy(go.GetComponent<MeshCollider>());
+
+            var mr  = go.GetComponent<MeshRenderer>();
+            var sh  = Shader.Find("Universal Render Pipeline/Unlit")
+                   ?? Shader.Find("Sprites/Default");
+            var mat = new Material(sh);
+            mat.SetFloat("_Surface",  1f);
+            mat.SetFloat("_Blend",    0f);
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_ZWrite",   0f);
+            mat.SetFloat("_Cull",     0f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = 3000;
+            mat.SetTexture("_BaseMap", tex);
+            mat.mainTexture = tex;
+            mat.SetColor("_BaseColor", Color.white);
+            mr.sharedMaterial = mat;
+
+            return go;
+        }
+
+        /// <summary>
+        /// Builds an animated star-surface sphere using the SGT Star shader.
+        /// Falls back to a bright emissive URP Lit sphere if SGT is unavailable.
+        /// </summary>
+        private static GameObject BuildSgtStarHologram(CelestialBody body)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = body.objectName + "_StarHologram";
+
+            // Spectral colour from B-V colour index
+            Color starCol = body.colorIndex < -0.1f ? new Color(0.65f, 0.75f, 1.00f) :  // hot blue
+                            body.colorIndex <  0.3f  ? new Color(0.85f, 0.92f, 1.00f) :  // blue-white
+                            body.colorIndex <  0.6f  ? new Color(1.00f, 1.00f, 0.90f) :  // white
+                            body.colorIndex <  1.0f  ? new Color(1.00f, 0.85f, 0.50f) :  // yellow
+                                                       new Color(1.00f, 0.45f, 0.15f);   // orange-red giant
+
+            Shader sh    = Shader.Find("Space Graphics Toolkit/Star");
+            bool   hasSGT = sh != null;
+            if (!hasSGT) sh = Shader.Find("Universal Render Pipeline/Lit");
+
+            var mat = new Material(sh) { name = body.objectName + "_StarMat" };
+
+            if (hasSGT)
+            {
+                mat.SetColor("_Color",            starCol);
+                mat.SetFloat("_Brightness",        1.8f);
+                mat.SetFloat("_NoiseSpeed",        12f);
+                mat.SetFloat("_NoiseOctaves",       6f);
+                mat.SetFloat("_NoiseStrength",      0.4f);
+                mat.SetFloat("_FlowStrength",       1.0f);
+                mat.SetFloat("_SunspotsStrength",   1.0f);
+                mat.SetColor("_RimColor", new Color(starCol.r * 2f, starCol.g * 1.2f, starCol.b * 0.5f, 1f));
+                mat.SetFloat("_RimPower", 2.5f);
+
+                var flowTex    = Resources.Load<Texture2D>("DSO/Star/Examples/Textures/StarFlow");
+                var sunspotTex = Resources.Load<Texture2D>("DSO/Star/Examples/Textures/StarSunspotsA");
+                if (flowTex    != null) mat.SetTexture("_FlowTex",     flowTex);
+                if (sunspotTex != null) mat.SetTexture("_SunspotsTex", sunspotTex);
+            }
+            else
+            {
+                mat.SetColor("_BaseColor",     starCol);
+                mat.SetColor("_EmissionColor", starCol * 2f);
+                mat.EnableKeyword("_EMISSION");
+            }
+
+            var r = go.GetComponent<MeshRenderer>();
+            r.sharedMaterial    = mat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows    = false;
+            Object.Destroy(go.GetComponent<Collider>());
+            return go;
+        }
+
+        /// <summary>
+        /// Builds a DSO hologram quad with an SGT Galaxy or Nebula shader overlay.
+        /// Falls back to cloning the sky billboard if the shader is unavailable.
+        /// </summary>
+        private static GameObject BuildSgtDSOHologram(CelestialBody body)
+        {
+            var go = Object.Instantiate(body.gameObject);
+            go.name = body.objectName + "_DSOHologram";
+
+            bool isGalaxy = body.dsoSubType != null && body.dsoSubType.Contains("Galaxy");
+            bool isNebula = body.dsoSubType != null &&
+                (body.dsoSubType == "Nebula" ||
+                 body.dsoSubType == "PlanetaryNebula" ||
+                 body.dsoSubType == "SupernovaRemnant");
+
+            string shaderName = isGalaxy ? "Space Graphics Toolkit/Galaxy"
+                              : isNebula ? "Space Graphics Toolkit/Nebula"
+                              : null;
+
+            if (shaderName != null)
+            {
+                Shader sh = Shader.Find(shaderName);
+                if (sh != null)
+                {
+                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        var mat = new Material(sh) { name = body.objectName + "_DSOHologramMat" };
+                        mat.SetColor("_SGT_Tint", Color.white);
+
+                        if (isGalaxy)
+                        {
+                            var baseTex  = Resources.Load<Texture2D>("DSO/Galaxy/Examples/Textures/SpiralGalaxy");
+                            var dustTex  = Resources.Load<Texture2D>("DSO/Galaxy/Examples/Textures/Galaxy_Dust");
+                            var starsTex = Resources.Load<Texture2D>("DSO/Galaxy/Examples/Textures/Galaxy_Stars");
+                            if (baseTex  != null) mat.SetTexture("_SGT_BaseTexture",  baseTex);
+                            if (dustTex  != null) mat.SetTexture("_SGT_DustTexture",  dustTex);
+                            if (starsTex != null) mat.SetTexture("_SGT_StarsTexture", starsTex);
+                            mat.SetFloat("_SGT_BaseScale", 1f);
+                            mat.SetFloat("_SGT_DustScale", 0.2f);
+                            mat.SetFloat("_SGT_DustTwist", -1.0f);
+                            mat.SetFloat("_HasDust",       1f);
+                            mat.SetFloat("_HasStars",      1f);
+                        }
+                        else // nebula/supernova
+                        {
+                            var nebTex = Resources.Load<Texture2D>("DSO/Nebula/Examples/Textures/Nebula");
+                            if (nebTex != null) mat.SetTexture("_SGT_Texture", nebTex);
+                            mat.SetFloat("_SGT_TextureScale",  0.425f);
+                            mat.SetFloat("_SGT_TextureJitter", 1.5f);
+                        }
+
+                        // Additive blend — black pixels vanish, bright regions glow
+                        mat.SetFloat("_Surface",  1f);
+                        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+                        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+                        mat.SetFloat("_ZWrite",   0f);
+                        mat.renderQueue = 3000;
+                        r.sharedMaterial = mat;
+                    }
+                }
+            }
 
             return go;
         }

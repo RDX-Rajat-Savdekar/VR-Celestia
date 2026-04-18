@@ -329,6 +329,18 @@ namespace CelestiaVR.Constellations
                 body.bodyType     = CelestialBodyType.Constellation;
                 body.description  = $"{def.Name} ({def.Abbreviation}) — one of the 88 IAU constellations.";
 
+                // Store the Latin PNG name so InspectionController/Panel can load it correctly.
+                // objectName uses English ("Eagle") but files use Latin ("aquila"), so we cache
+                // the PNG name from StellariumArtData keyed by the shared 3-letter abbreviation.
+                foreach (var art in StellariumArtData.All)
+                {
+                    if (art.Abbreviation == def.Abbreviation)
+                    {
+                        body.dsoSubType = art.PngName; // e.g. "aquila", "ursa-major"
+                        break;
+                    }
+                }
+
                 // Large sphere collider so dwell-gaze can hit it even with star-sphere tolerance
                 var col = go.AddComponent<SphereCollider>();
                 col.radius    = 20f;

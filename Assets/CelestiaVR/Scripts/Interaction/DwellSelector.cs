@@ -35,16 +35,28 @@ namespace CelestiaVR.Interaction
 
         [Tooltip("Acquisition sphere-cast radius (Unity units). Larger = more forgiving initial lock-on.")]
         [Range(1f, 80f)]
-        public float gazeTolerance = 20f;
+        public float gazeTolerance = 30f;
 
         [Tooltip("Exit sphere-cast radius. Gaze must move this far from the target centre before the " +
                  "lock is released. Should be larger than gazeTolerance to avoid accumulator resets.")]
         [Range(1f, 120f)]
-        public float gazeExitTolerance = 40f;
+        public float gazeExitTolerance = 55f;
 
         [Header("References")]
         [Tooltip("The camera to cast the gaze ray from (usually Main Camera / XR Camera).")]
         public Camera gazeCamera;
+
+        [Header("Dwell Filters")]
+        [Tooltip("Allow dwell selection of billboard stars.")]
+        public bool dwellStars = true;
+        [Tooltip("Allow dwell selection of planets and moons.")]
+        public bool dwellPlanets = true;
+        [Tooltip("Allow dwell selection of deep-sky objects and constellations.")]
+        public bool dwellDeepSky = true;
+        [Tooltip("Objects whose direction from the camera dips below this elevation (degrees) are ignored. " +
+                 "0 = strict horizon, positive = must be above horizon. Prevents selecting planets through the island floor.")]
+        [Range(-10f, 20f)]
+        public float minElevationDeg = 5f;
 
         // Events
         public event Action<CelestialBody> OnDwellSelect;
@@ -65,6 +77,7 @@ namespace CelestiaVR.Interaction
         /// </summary>
         public void InjectSoftwareTarget(CelestialBody body)
         {
+            if (!dwellStars) return; // stars filtered out in menu
             _softwareTarget = body;
             _softwareInjectedThisFrame = true;
         }
@@ -134,33 +147,69 @@ namespace CelestiaVR.Interaction
         /// <summary>
         /// SphereCastAll within acquisition radius, then returns the CelestialBody whose
         /// world-space centre is angularly closest to the gaze direction.
-        /// This ensures nearby competing planets never steal focus.
+        ///
+        /// Priority boost: planets/moons and DSOs get their scoring angle multiplied by a
+        /// factor < 1 so they win over nearby stars even when slightly off-centre. This
+        /// compensates for planets having small colliders compared to billboard stars.
+        ///
+        /// Type filters and horizon culling are applied before scoring.
         /// </summary>
         private CelestialBody FindBestCandidate(Ray ray)
         {
             var hits = Physics.SphereCastAll(ray, gazeTolerance, maxDistance, celestialLayers);
 
             CelestialBody best      = null;
-            float         bestAngle = float.MaxValue;
+            float         bestScore = float.MaxValue;
 
             foreach (var h in hits)
             {
                 var body = h.collider.GetComponentInParent<CelestialBody>();
                 if (body == null) continue;
 
-                // Angle between gaze forward and direction to this body's world centre
-                Vector3 dirToBody = (body.transform.position - ray.origin).normalized;
-                float   angle     = Vector3.Angle(ray.direction, dirToBody);
+                // ── Type filter ──────────────────────────────────────────────────
+                if (!IsTypeAllowed(body)) continue;
 
-                if (angle < bestAngle)
+                Vector3 dirToBody = (body.transform.position - ray.origin).normalized;
+
+                // ── Horizon culling ───────────────────────────────────────────────
+                // Elevation = angle above/below the horizontal plane (world Y).
+                float elevDeg = Mathf.Asin(Mathf.Clamp(dirToBody.y, -1f, 1f)) * Mathf.Rad2Deg;
+                if (elevDeg < minElevationDeg) continue;
+
+                // ── Priority scoring ──────────────────────────────────────────────
+                // Angle between gaze forward and direction to this body's world centre.
+                float angle = Vector3.Angle(ray.direction, dirToBody);
+
+                // Planets/moons: score × 0.15 → strong priority so they always win nearby stars.
+                // DSOs/constellations: score × 0.45 → moderate boost.
+                float score = body.bodyType switch
                 {
-                    bestAngle = angle;
+                    CelestialBodyType.Planet         => angle * 0.15f,
+                    CelestialBodyType.Moon           => angle * 0.15f,
+                    CelestialBodyType.DeepSkyObject  => angle * 0.45f,
+                    CelestialBodyType.Constellation  => angle * 0.45f,
+                    _                                => angle,
+                };
+
+                if (score < bestScore)
+                {
+                    bestScore = score;
                     best      = body;
                 }
             }
 
             return best;
         }
+
+        private bool IsTypeAllowed(CelestialBody body) => body.bodyType switch
+        {
+            CelestialBodyType.Star           => dwellStars,
+            CelestialBodyType.Planet         => dwellPlanets,
+            CelestialBodyType.Moon           => dwellPlanets,
+            CelestialBodyType.DeepSkyObject  => dwellDeepSky,
+            CelestialBodyType.Constellation  => dwellDeepSky,
+            _                                => true,
+        };
 
         /// <summary>
         /// Returns true if the gaze ray is still close enough to <paramref name="target"/>
@@ -169,11 +218,14 @@ namespace CelestiaVR.Interaction
         private bool IsWithinExitTolerance(Ray ray, CelestialBody target)
         {
             Vector3 dirToTarget = (target.transform.position - ray.origin).normalized;
-            float   dist        = Vector3.Distance(ray.origin, target.transform.position);
 
-            // Perpendicular distance from ray to target centre ≈ sin(angle) * dist
-            float angle       = Vector3.Angle(ray.direction, dirToTarget);
-            float perpDist    = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
+            // Drop the hysteresis lock immediately if target is below the elevation threshold
+            float elevDeg = Mathf.Asin(Mathf.Clamp(dirToTarget.y, -1f, 1f)) * Mathf.Rad2Deg;
+            if (elevDeg < minElevationDeg) return false;
+
+            float dist     = Vector3.Distance(ray.origin, target.transform.position);
+            float angle    = Vector3.Angle(ray.direction, dirToTarget);
+            float perpDist = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
 
             return perpDist <= gazeExitTolerance;
         }

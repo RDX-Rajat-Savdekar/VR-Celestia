@@ -186,22 +186,27 @@ namespace CelestiaVR.UI
             if (objectTypeText != null)
                 objectTypeText.text = FriendlyType(body);
 
-            // Constellation artwork image
+            // Object artwork / photo image (constellations, named stars, DSOs)
             if (_constellationArtImage != null)
             {
+                Texture2D artTex = null;
                 if (body.bodyType == CelestialBodyType.Constellation)
                 {
-                    string pngName = body.objectName.ToLower().Replace(" ", "-");
-                    var tex = Resources.Load<Texture2D>("ConstellationArt/" + pngName);
-                    if (tex != null)
-                    {
-                        _constellationArtImage.texture = tex;
-                        _constellationArtImage.gameObject.SetActive(true);
-                    }
-                    else
-                    {
-                        _constellationArtImage.gameObject.SetActive(false);
-                    }
+                    string pngName = !string.IsNullOrEmpty(body.dsoSubType)
+                        ? body.dsoSubType
+                        : body.objectName.ToLower().Replace(" ", "-");
+                    artTex = Resources.Load<Texture2D>("ConstellationArt/" + pngName);
+                }
+                else if (body.bodyType == CelestialBodyType.Star)
+                {
+                    string imgKey = body.objectName.ToLower().Replace(" ", "-");
+                    artTex = Resources.Load<Texture2D>("StarImages/" + imgKey);
+                }
+
+                if (artTex != null)
+                {
+                    _constellationArtImage.texture = artTex;
+                    _constellationArtImage.gameObject.SetActive(true);
                 }
                 else
                 {

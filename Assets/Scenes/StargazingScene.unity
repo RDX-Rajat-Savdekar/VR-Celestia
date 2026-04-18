@@ -699,12 +699,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38c35487e21024c2388d33cd525b404d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CelestiaVR.Stars.DeepSkyObjectSpawner
-  billboardMaterial: {fileID: 2100000, guid: e632a9ccc74b14547bbf874f271ee63e, type: 2}
-  images:
-  - {fileID: 2800000, guid: d6008a35f0c3b4a399f884b983e3a4d3, type: 3}
-  - {fileID: 2800000, guid: addc76bf81f5e407c9dedcc64b363022, type: 3}
-  - {fileID: 2800000, guid: 5b5b26f6b8c42482e8993449f856aa68, type: 3}
-  - {fileID: 2800000, guid: 881e4f843eb6744a7b0fc942d81be7fb, type: 3}
 --- !u!1 &550919777
 GameObject:
   m_ObjectHideFlags: 0
@@ -2001,6 +1995,10 @@ MonoBehaviour:
   gazeTolerance: 15
   gazeExitTolerance: 40
   gazeCamera: {fileID: 1373153108}
+  dwellStars: 1
+  dwellPlanets: 1
+  dwellDeepSky: 1
+  minElevationDeg: -10
 --- !u!1 &1405967782
 GameObject:
   m_ObjectHideFlags: 0

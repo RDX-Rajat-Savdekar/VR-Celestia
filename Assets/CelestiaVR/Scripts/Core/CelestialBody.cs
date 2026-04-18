@@ -31,6 +31,8 @@ namespace CelestiaVR.Core
         public float physicalRadiusKm = 0f;
         [Tooltip("Surface temperature in Kelvin. Estimated from B-V for stars.")]
         public float temperatureK = 0f;
+        [Tooltip("DSO subtype string set by DeepSkyObjectSpawner (e.g. SpiralGalaxy, Nebula). Empty for non-DSO bodies.")]
+        public string dsoSubType;
 
         [Header("Positional Data")]
         public float rightAscensionHours;
