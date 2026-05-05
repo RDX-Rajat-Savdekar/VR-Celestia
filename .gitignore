@@ -71,6 +71,9 @@ Thumbs.db
 /Assets/CelestiaVR_resources/PlanetTextures.zip
 /Assets/CelestiaVR_resources/Space Graphics Toolkit v4.1/*.unitypackage
 
+# Duplicate star catalog (Assets/Data/hyg_v42.csv is the tracked copy)
+/Assets/CelestiaVR_resources/HYG_StarDataBase/hyg_v42.csv
+
 # Space Graphics Toolkit plugin — not used by this project
 /Assets/Plugins/
 
