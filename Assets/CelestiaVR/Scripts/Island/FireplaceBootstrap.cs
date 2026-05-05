@@ -36,9 +36,13 @@ namespace CelestiaVR.Island
         public GameObject stickGlb;
         public GameObject flareGunGlb;
 
+        [Header("Testing")]
+        [Tooltip("Spawn gun and show fireplace model immediately, skipping stick collection.")]
+        public bool spawnImmediately = true;
+
         [Header("Positions (world-space — leave islandAnchor empty to use directly)")]
         public Vector3 fireplaceOffset = new Vector3(4.11f, 0.144f, -0.16f);
-        public Vector3 flareGunOffset  = new Vector3(0f,    0.5f,   0f);
+        public Vector3 flareGunOffset  = new Vector3(0.8f,  0.9f,   0f);
 
         // Sticks scattered around the fireplace in world space (near To_Place_Fireplace).
         // These are overridden at runtime if To_Place_Fireplace is found.
@@ -132,6 +136,14 @@ namespace CelestiaVR.Island
 
             SpawnSite();
             SpawnSticks();
+
+            if (spawnImmediately)
+            {
+                // Show fireplace model right away and spawn the gun without needing sticks
+                if (_site != null && _site.fireplaceModel != null)
+                    _site.fireplaceModel.SetActive(true);
+                SpawnFlareGun();
+            }
         }
 
         // ── Spawners ──────────────────────────────────────────────────────────────
@@ -238,10 +250,10 @@ namespace CelestiaVR.Island
             col.size              = new Vector3(0.12f, 0.18f, 0.35f);
             col.center            = new Vector3(0f, 0.04f, 0.03f);
 
-            // XR Grab
+            // XR Grab — InstantaneousMovement so the gun snaps to and stays with the hand
             var grab              = gunGO.AddComponent<XRGrabInteractable>();
-            grab.movementType     = XRBaseInteractable.MovementType.VelocityTracking;
-            grab.throwOnDetach    = true;
+            grab.movementType     = XRBaseInteractable.MovementType.Instantaneous;
+            grab.throwOnDetach    = false;
             grab.useDynamicAttach = true;
 
             // Muzzle point

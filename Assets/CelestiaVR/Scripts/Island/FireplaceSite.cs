@@ -111,7 +111,7 @@ namespace CelestiaVR.Island
 
         public void LightFire()
         {
-            if (CurrentState != State.Built) return;
+            if (CurrentState == State.Lit) return; // already burning
             CurrentState = State.Lit;
             SoundManager.Instance?.Play(SoundEvent.FireIgnite, transform.position);
             Debug.Log("[FireplaceSite] Fire lit!");

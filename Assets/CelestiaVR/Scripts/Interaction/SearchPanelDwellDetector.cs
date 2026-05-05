@@ -27,8 +27,8 @@ namespace CelestiaVR.Interaction
     public class SearchPanelDwellDetector : MonoBehaviour
     {
         [Header("Dwell settings")]
-        public float triggerDwellTime = 2.5f;
-        public float itemDwellTime    = 1.5f;   // shorter when using controller ray
+        public float triggerDwellTime = 3.5f;
+        public float itemDwellTime    = 2.5f;   // shorter when using controller ray
 
         [Header("Gaze ray (panel closed)")]
         public float castRadius = 0.12f;
