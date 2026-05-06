@@ -45,7 +45,9 @@ namespace CelestiaVR.Island
 
         // ── Runtime ───────────────────────────────────────────────────────────────
 
-        private const int RequiredSticks = 4;
+        [Header("Gameplay")]
+        [Tooltip("How many wood logs must be deposited before the site can be lit.")]
+        public int requiredLogs = 3;
         private int _sticksPlaced = 0;
         private readonly List<StickCollectible> _sticks = new();
 
@@ -102,8 +104,8 @@ namespace CelestiaVR.Island
         public void OnStickDeposited()
         {
             _sticksPlaced++;
-            CurrentState = _sticksPlaced < RequiredSticks ? State.Gathering : State.Built;
-            Debug.Log($"[FireplaceSite] Sticks: {_sticksPlaced}/{RequiredSticks}  State: {CurrentState}");
+            CurrentState = _sticksPlaced < requiredLogs ? State.Gathering : State.Built;
+            Debug.Log($"[FireplaceSite] Logs: {_sticksPlaced}/{requiredLogs}  State: {CurrentState}");
 
             if (CurrentState == State.Built)
                 StartCoroutine(TransitionToBuilt());
@@ -166,8 +168,8 @@ namespace CelestiaVR.Island
             // 4. Hide ring
             if (_ringRenderer != null) _ringRenderer.enabled = false;
 
-            // 5. Spawn flare gun
-            FireplaceBootstrap.Instance?.SpawnFlareGun();
+            // Flare gun is already in the scene from the start (spawned by FireplaceBootstrap).
+            // Fire can now be lit by shooting the site with the flare gun.
         }
 
         // ── Visuals ───────────────────────────────────────────────────────────────

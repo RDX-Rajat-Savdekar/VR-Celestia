@@ -53,7 +53,7 @@ namespace CelestiaVR.Environment
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.fog         = false;
 
-            if (useDaySkyDome)
+            if (useDaySkyDome && _sky != null)
                 BuildDaySkyDome();
         }
 

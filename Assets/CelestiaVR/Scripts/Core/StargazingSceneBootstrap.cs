@@ -62,6 +62,13 @@ namespace CelestiaVR.Core
             RenderSettings.skybox = null;
         }
 
+        private void Awake()
+        {
+            // Destroy any DontDestroyOnLoad overlay left behind by DoorPortal (fade canvas)
+            var fade = GameObject.Find("[PortalFade]");
+            if (fade != null) Destroy(fade);
+        }
+
         /// <summary>
         /// The scene has two baked directional lights (both intensity 1) left over from
         /// the VR template. SunController creates and manages its own directional light,
@@ -84,8 +91,8 @@ namespace CelestiaVR.Core
         {
             var cam = Camera.main;
             if (cam == null) return;
-            cam.clearFlags       = CameraClearFlags.SolidColor;
-            cam.backgroundColor  = Color.black;
+            cam.clearFlags      = CameraClearFlags.SolidColor;
+            cam.backgroundColor = Color.black;
         }
 
         private void WireInteraction()

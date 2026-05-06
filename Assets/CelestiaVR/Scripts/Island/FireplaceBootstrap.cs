@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 namespace CelestiaVR.Island
@@ -10,14 +9,14 @@ namespace CelestiaVR.Island
     ///
     /// Instantiates and wires:
     ///   • FireplaceSite  — glowing ground marker + state machine
-    ///   • 4× StickCollectible — grabbable sticks scattered around the island
-    ///   • FlareGun (deferred) — appears once all 4 sticks are placed
+    ///   • 3× WoodLog     — grabbable logs scattered around the island
+    ///   • FlareGun       — spawned at scene start, positioned near the fireplace site
+    ///
+    /// The flare gun is always present. It only ignites the fire when
+    /// the wood logs have been deposited at the site (Built state).
     ///
     /// All positions are expressed in island-local space and transformed by
     /// islandAnchor.TransformPoint() so they follow the island's rotation/scale.
-    ///
-    /// GLB references are auto-loaded via AssetDatabase in the editor. On device,
-    /// the inspector-assigned references (populated by OnValidate) are used.
     ///
     /// Added to the scene by StargazingSceneBootstrap.EnsureFireplaceMiniGame().
     /// </summary>
@@ -33,7 +32,7 @@ namespace CelestiaVR.Island
 
         [Header("Prefabs (auto-loaded in editor via OnValidate)")]
         public GameObject fireplaceGlb;
-        public GameObject stickGlb;
+        public GameObject woodLogGlb;   // Optional dedicated log model; falls back to procedural
         public GameObject flareGunGlb;
 
         [Header("Testing")]
@@ -44,30 +43,23 @@ namespace CelestiaVR.Island
         public Vector3 fireplaceOffset = new Vector3(4.11f, 0.144f, -0.16f);
         public Vector3 flareGunOffset  = new Vector3(0.8f,  0.9f,   0f);
 
-        // Sticks scattered around the fireplace in world space (near To_Place_Fireplace).
-        // These are overridden at runtime if To_Place_Fireplace is found.
-        // Y = 0.5 keeps them above ground until you tune per-scene.
-        public Vector3[] stickOffsets = new Vector3[]
-        {
-            new Vector3(-24.0f, 0.5f, -27.0f),
-            new Vector3(-29.5f, 0.5f, -26.5f),
-            new Vector3(-25.5f, 0.5f, -30.5f),
-            new Vector3(-30.0f, 0.5f, -29.0f),
-        };
-
-        // Stick pile offsets so deposited sticks don't all overlap at the site centre
-        private static readonly Vector3[] SnapOffsets = new Vector3[]
-        {
-            new Vector3(-0.1f, 0.05f,  0.05f),
-            new Vector3( 0.1f, 0.05f, -0.05f),
-            new Vector3(-0.05f, 0.1f, -0.1f),
-            new Vector3( 0.05f, 0.1f,  0.1f),
-        };
+        [Tooltip("How far in front of the player to spawn the fireplace when no scene marker is found.")]
+        public float spawnDistanceMetres = 3.05f; // ≈ 10 feet
 
         // ── Runtime ───────────────────────────────────────────────────────────────
 
+        private Vector3[] woodLogOffsets;
+
+        // Log pile offsets so deposited logs don't all overlap at the site centre
+        private static readonly Vector3[] SnapOffsets = new Vector3[]
+        {
+            new Vector3(-0.12f, 0.04f,  0.0f),
+            new Vector3( 0.12f, 0.04f,  0.0f),
+            new Vector3( 0.0f,  0.10f,  0.0f),
+        };
+
         private FireplaceSite              _site;
-        private readonly List<StickCollectible> _sticks = new();
+        private readonly List<StickCollectible> _logs = new();
         private GameObject                 _flarePrototype;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -83,10 +75,10 @@ namespace CelestiaVR.Island
             const string root = "Assets/CelestiaVR_resources/FirePlace_Env/Prefabs_FireENv/";
             if (fireplaceGlb == null)
                 fireplaceGlb = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(root + "small_fire_place.prefab");
-            if (stickGlb == null)
-                stickGlb     = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(root + "lowpoly_stick_-_01.prefab");
             if (flareGunGlb == null)
                 flareGunGlb  = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(root + "flare_gun.prefab");
+            if (woodLogGlb == null)
+                woodLogGlb   = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(root + "lowpoly_stick_-_01.prefab");
         }
 #endif
 
@@ -100,39 +92,48 @@ namespace CelestiaVR.Island
 #endif
         }
 
-        /// <summary>
-        /// Runtime fallback for on-device builds where AssetDatabase is unavailable.
-        /// Prefabs must be placed in Assets/Resources/FirePlaceEnv/ for Resources.Load to find them.
-        /// </summary>
         private void TryLoadFromResources()
         {
             const string root = "FirePlaceEnv/";
             if (fireplaceGlb == null) fireplaceGlb = Resources.Load<GameObject>(root + "small_fire_place");
-            if (stickGlb     == null) stickGlb     = Resources.Load<GameObject>(root + "lowpoly_stick_-_01");
             if (flareGunGlb  == null) flareGunGlb  = Resources.Load<GameObject>(root + "flare_gun");
+            if (woodLogGlb   == null) woodLogGlb   = Resources.Load<GameObject>(root + "lowpoly_stick_-_01");
         }
 
         private void Start()
         {
-            // Idempotent — StargazingSceneBootstrap already guards before creating us,
-            // but double-check in case Bootstrap is re-run or manually placed.
             if (FindFirstObjectByType<FireplaceSite>() != null) return;
 
-            // On device, AssetDatabase is unavailable so OnValidate never ran — fall back to
-            // Resources.Load. Prefabs must live in Assets/Resources/FirePlaceEnv/ for this to work.
             TryLoadFromResources();
 
-            if (!ValidateGLBs()) return;
+            if (!ValidateCore()) return;
 
-            // If the designer placed a "To_Place_Fireplace" empty GO in the scene,
-            // use its world position as the authoritative fireplace location.
+            // Priority 1: designer-placed To_Place_Fireplace marker
             var marker = GameObject.Find("To_Place_Fireplace");
             if (marker != null)
             {
+                islandAnchor    = null;
                 fireplaceOffset = marker.transform.position;
-                islandAnchor    = null; // positions are already world-space
                 Debug.Log($"[FireplaceBootstrap] Using To_Place_Fireplace position: {fireplaceOffset}");
             }
+            else
+            {
+                // Priority 2: 10 feet in front of the XR Origin (player)
+                islandAnchor    = null;
+                fireplaceOffset = GetSpawnInFront(spawnDistanceMetres);
+                Debug.Log($"[FireplaceBootstrap] Spawning 10 ft in front of player at: {fireplaceOffset}");
+            }
+
+            // Flare gun: 1 m to the right of the fireplace, at grab height
+            flareGunOffset = fireplaceOffset + new Vector3(1.0f, 0.9f, 0f);
+
+            // Logs: scattered in a loose ring around the fireplace
+            woodLogOffsets = new Vector3[]
+            {
+                fireplaceOffset + new Vector3(-1.2f, 0f,  0.5f),
+                fireplaceOffset + new Vector3( 1.2f, 0f,  0.3f),
+                fireplaceOffset + new Vector3( 0.0f, 0f, -1.3f),
+            };
 
             SpawnSite();
             SpawnSticks();
@@ -152,24 +153,21 @@ namespace CelestiaVR.Island
         {
             var siteGO = new GameObject("[FireplaceSite]");
 
-            // Parent under To_Place_Fireplace if it exists, for clean hierarchy
             var marker = GameObject.Find("To_Place_Fireplace");
             if (marker != null)
-                siteGO.transform.SetParent(marker.transform, false); // worldPositionStays = false → localPos zero
+                siteGO.transform.SetParent(marker.transform, false);
 
             siteGO.transform.position = AnchorPos(fireplaceOffset);
 
             _site = siteGO.AddComponent<FireplaceSite>();
+            _site.requiredLogs = woodLogOffsets.Length;  // match spawned count
 
-            // Instantiate fireplace model as inactive child (enabled by state machine)
             if (fireplaceGlb != null)
             {
                 var fp = Instantiate(fireplaceGlb, siteGO.transform);
-                // Reset local transform so the model sits exactly at the site position
-                // regardless of any root offset baked into the GLB on export.
                 fp.transform.localPosition = Vector3.zero;
-                fp.transform.localRotation = Quaternion.identity;
-                // Fix glTF shaders → URP Lit so the model renders on Quest (Android)
+                // Do NOT reset localRotation — the GLB importer bakes an axis-correction
+                // rotation into the root (typically -90° X). Overriding it tilts the model.
                 FireplaceSite.FixGLBShaders(fp, 0.5f);
                 fp.SetActive(false);
                 _site.fireplaceModel = fp;
@@ -180,75 +178,85 @@ namespace CelestiaVR.Island
 
         private void SpawnSticks()
         {
-            if (stickGlb == null) return;
-
-            for (int i = 0; i < stickOffsets.Length; i++)
+            for (int i = 0; i < woodLogOffsets.Length; i++)
             {
-                var stickGO = Instantiate(stickGlb);
-                stickGO.name = $"[Stick_{i}]";
-                stickGO.transform.position = AnchorPos(stickOffsets[i]);
-                stickGO.transform.rotation = Quaternion.Euler(
-                    Random.Range(-10f, 10f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
+                GameObject logGO;
+                if (woodLogGlb != null)
+                {
+                    logGO = Instantiate(woodLogGlb);
+                    // The lowpoly_stick GLB exports at ~0.006 scale; scale up to grabbable size
+                    logGO.transform.localScale = Vector3.one * 0.012f;
+                    FireplaceSite.FixGLBShaders(logGO, 0.15f);
+                }
+                else
+                {
+                    logGO = BuildProceduralLog();
+                }
 
-                // Fix glTF shaders → URP Lit so sticks render on Quest (Android)
-                FireplaceSite.FixGLBShaders(stickGO, 0.4f);
+                logGO.name = $"[WoodLog_{i}]";
+                logGO.transform.position = AnchorPos(woodLogOffsets[i]);
+                logGO.transform.rotation = Quaternion.Euler(
+                    Random.Range(-8f, 8f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
 
-                // Physics — no gravity so sticks stay at their spawn position.
-                // The island GLB has no physics mesh, so gravity would send them to the ocean floor.
-                var rb              = stickGO.AddComponent<Rigidbody>();
-                rb.mass             = 0.3f;
-                rb.linearDamping    = 0.5f;
-                rb.angularDamping   = 1f;
+                // Physics — no gravity so logs stay at spawn height
+                var rb              = logGO.AddComponent<Rigidbody>();
+                rb.mass             = 1.2f;
+                rb.linearDamping    = 0.6f;
+                rb.angularDamping   = 1.2f;
                 rb.useGravity       = false;
 
-                // Collider — capsule oriented along Z (length of the stick)
-                var col             = stickGO.AddComponent<CapsuleCollider>();
-                col.height          = 0.4f;
-                col.radius          = 0.025f;
-                col.direction       = 2; // Z
+                // Collider — capsule along Z (length of the log)
+                var col             = logGO.AddComponent<CapsuleCollider>();
+                col.height          = 0.38f;
+                col.radius          = 0.045f;
+                col.direction       = 2; // Z axis
 
                 // XR Grab
-                var grab            = stickGO.AddComponent<XRGrabInteractable>();
+                var grab            = logGO.AddComponent<XRGrabInteractable>();
                 grab.movementType   = XRBaseInteractable.MovementType.VelocityTracking;
                 grab.throwOnDetach  = true;
                 grab.useDynamicAttach = true;
 
-                // Collectible
-                var stick           = stickGO.AddComponent<StickCollectible>();
-                stick.targetSite    = _site;
-                stick.snapOffset    = SnapOffsets[i % SnapOffsets.Length];
+                // Collectible component (same logic as sticks)
+                var log             = logGO.AddComponent<StickCollectible>();
+                log.targetSite      = _site;
+                log.snapOffset      = SnapOffsets[i % SnapOffsets.Length];
 
-                _sticks.Add(stick);
+                _logs.Add(log);
             }
 
-            Debug.Log($"[FireplaceBootstrap] {_sticks.Count} sticks spawned.");
+            Debug.Log($"[FireplaceBootstrap] {_logs.Count} wood logs spawned.");
         }
 
-        /// <summary>Called by FireplaceSite.TransitionToBuilt() once all sticks are placed.</summary>
+        /// <summary>
+        /// Spawns the flare gun and parents it directly to the right hand controller
+        /// so it's always held — no grabbing needed.
+        /// The muzzle point is parented to the same hand anchor so it always
+        /// fires in the controller's forward direction regardless of gun model orientation.
+        /// </summary>
         public void SpawnFlareGun()
         {
             if (flareGunGlb == null) return;
 
-            var gunGO             = Instantiate(flareGunGlb);
-            gunGO.name            = "[FlareGun]";
-            gunGO.transform.position = _site != null
-                ? _site.transform.position + flareGunOffset
-                : AnchorPos(fireplaceOffset + flareGunOffset);
+            var rightHand = FindRightHandAnchor();
+            if (rightHand == null)
+            {
+                Debug.LogWarning("[FireplaceBootstrap] Could not find right hand anchor — gun not spawned.");
+                return;
+            }
 
-            // Fix glTF shaders → URP Lit so the gun renders on Quest (Android)
+            var gunGO = Instantiate(flareGunGlb);
+            gunGO.name = "[FlareGun]";
             FireplaceSite.FixGLBShaders(gunGO, 0.3f);
 
-            // Physics — no gravity so it floats at spawn height (island has no physics mesh)
-            var rb                = gunGO.AddComponent<Rigidbody>();
-            rb.mass               = 0.6f;
-            rb.linearDamping      = 0.4f;
-            rb.angularDamping     = 0.8f;
-            rb.useGravity         = false;
+            // Parent to right hand — no Rigidbody or XRGrabInteractable needed
+            gunGO.transform.SetParent(rightHand, false);
 
-            // Collider — generous size so the hand can grab it easily
-            var col               = gunGO.AddComponent<BoxCollider>();
-            col.size              = new Vector3(0.12f, 0.18f, 0.35f);
-            col.center            = new Vector3(0f, 0.04f, 0.03f);
+            // Position: slightly forward and down so the grip sits in the palm
+            // The barrel is in controller +Y after import (gun stands upright when arm is forward).
+            // Rotating -90° around X maps +Y → +Z, so the barrel now points forward with the arm.
+            gunGO.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            gunGO.transform.localPosition = new Vector3(0f, -0.02f, 0.05f);
 
             // XR Grab — InstantaneousMovement so the gun snaps to and stays with the hand
             var grab              = gunGO.AddComponent<XRGrabInteractable>();
@@ -264,10 +272,105 @@ namespace CelestiaVR.Island
             // FlareGun component
             var gun               = gunGO.AddComponent<FlareGun>();
             gun.muzzlePoint       = muzzleGO.transform;
-            gun.launchSpeed       = 12f;
+            gun.launchSpeed       = 22f;
             gun.flareProjectilePrefab = BuildFlarePrototype();
 
-            Debug.Log("[FireplaceBootstrap] Flare gun spawned at " + gunGO.transform.position);
+            Debug.Log("[FireplaceBootstrap] Flare gun attached to right hand: " + rightHand.name);
+        }
+
+        /// <summary>
+        /// Finds the right-hand controller transform in the XR rig.
+        /// Tries ActionBasedController components first, then falls back to name search.
+        /// </summary>
+        private static Transform FindRightHandAnchor()
+        {
+            // 1. ActionBasedController (XRI3 standard)
+            foreach (var c in Object.FindObjectsByType<UnityEngine.XR.Interaction.Toolkit.ActionBasedController>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                var n = c.name.ToLowerInvariant();
+                if (n.Contains("right") && !n.Contains("left"))
+                    return c.transform;
+            }
+
+            // 2. Name search inside XR Origin hierarchy
+            var xrOrigin = GameObject.Find("XR Origin Hands (XR Rig)")
+                        ?? GameObject.Find("XR Origin (XR Rig)")
+                        ?? GameObject.Find("XR Origin");
+            if (xrOrigin != null)
+            {
+                foreach (var t in xrOrigin.GetComponentsInChildren<Transform>(true))
+                {
+                    var n = t.name.ToLowerInvariant();
+                    if (n.Contains("right") && !n.Contains("left")
+                        && (n.Contains("controller") || n.Contains("hand") || n.Contains("anchor")))
+                        return t;
+                }
+            }
+
+            // 3. Global GameObject.Find fallback
+            foreach (var candidate in new[] {
+                "Right Controller", "RightHand Controller", "Right Hand Controller",
+                "Right Hand", "RightHand", "Right Interactor" })
+            {
+                var go = GameObject.Find(candidate);
+                if (go != null) return go.transform;
+            }
+
+            return null;
+        }
+
+        // ── Procedural log mesh ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Creates a brown cylinder scaled to look like a wooden log (~8cm radius, ~36cm long).
+        /// Used as fallback when no woodLogGlb is assigned.
+        /// </summary>
+        private static GameObject BuildProceduralLog()
+        {
+            var root = new GameObject("WoodLog");
+
+            // Cylinder primitive (Unity default: height=2, radius=0.5 in local space)
+            var logBody       = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            logBody.name      = "LogBody";
+            logBody.transform.SetParent(root.transform, false);
+            // Scale: x/z = diameter 0.09m, y = half-height → 0.18 = 36cm long when rotated 90°
+            logBody.transform.localScale    = new Vector3(0.09f, 0.18f, 0.09f);
+            logBody.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // lie flat along Z
+
+            // Remove collider — we add CapsuleCollider on the root for better interaction
+            Object.Destroy(logBody.GetComponent<CapsuleCollider>());
+
+            // Brown wood material
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetColor("_BaseColor",   new Color(0.35f, 0.18f, 0.06f, 1f));
+            mat.SetFloat("_Metallic",    0f);
+            mat.SetFloat("_Smoothness",  0.08f);
+            logBody.GetComponent<MeshRenderer>().material = mat;
+
+            // End caps (slightly darker discs to show cross-section)
+            AddLogEndCap(root.transform,  new Vector3(0f, 0f,  0.18f));
+            AddLogEndCap(root.transform,  new Vector3(0f, 0f, -0.18f));
+
+            return root;
+        }
+
+        private static void AddLogEndCap(Transform parent, Vector3 localPos)
+        {
+            var cap       = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cap.name      = "LogCap";
+            cap.transform.SetParent(parent, false);
+            cap.transform.localPosition = localPos;
+            cap.transform.localScale    = new Vector3(0.09f, 0.005f, 0.09f);
+            cap.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+            Object.Destroy(cap.GetComponent<CapsuleCollider>());
+
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetColor("_BaseColor",  new Color(0.55f, 0.32f, 0.12f, 1f));
+            mat.SetFloat("_Metallic",   0f);
+            mat.SetFloat("_Smoothness", 0.05f);
+            cap.GetComponent<MeshRenderer>().material = mat;
         }
 
         // ── Flare prototype ───────────────────────────────────────────────────────
@@ -280,34 +383,44 @@ namespace CelestiaVR.Island
             _flarePrototype.SetActive(false);
             DontDestroyOnLoad(_flarePrototype);
 
-            // Visual — small glowing sphere
-            var mf     = _flarePrototype.AddComponent<MeshFilter>();
+            // Visual — large bright glowing sphere (impossible to miss)
+            var mf        = _flarePrototype.AddComponent<MeshFilter>();
             mf.sharedMesh = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
-            var mr     = _flarePrototype.AddComponent<MeshRenderer>();
-            var mat    = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.SetColor("_BaseColor",    new Color(1f, 0.5f, 0.1f));
-            mat.SetColor("_EmissionColor", new Color(2f, 0.8f, 0.1f));
+            var mr        = _flarePrototype.AddComponent<MeshRenderer>();
+            var mat       = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetColor("_BaseColor",     new Color(1f, 0.35f, 0f));
+            mat.SetColor("_EmissionColor", new Color(4f, 1.2f, 0f));   // very hot glow
             mat.EnableKeyword("_EMISSION");
             mr.sharedMaterial = mat;
-            _flarePrototype.transform.localScale = Vector3.one * 0.04f;
+            _flarePrototype.transform.localScale = Vector3.one * 0.12f; // 12 cm — clearly visible
+
+            // Point light so it illuminates surroundings as it flies
+            var lightGO       = new GameObject("FlareLight");
+            lightGO.transform.SetParent(_flarePrototype.transform, false);
+            var fl            = lightGO.AddComponent<Light>();
+            fl.type           = LightType.Point;
+            fl.color          = new Color(1f, 0.5f, 0.05f);
+            fl.intensity      = 3f;
+            fl.range          = 4f;
 
             // Physics
-            var rb             = _flarePrototype.AddComponent<Rigidbody>();
-            rb.mass            = 0.05f;
-            rb.linearDamping   = 0.01f;
-            rb.useGravity      = true;
-            var col            = _flarePrototype.AddComponent<SphereCollider>();
-            col.radius         = 0.5f; // world radius = 0.5 × scale 0.04 = 0.02 m
+            var rb                    = _flarePrototype.AddComponent<Rigidbody>();
+            rb.mass                   = 0.05f;
+            rb.linearDamping          = 0.01f;
+            rb.useGravity             = true;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            var sphereCol             = _flarePrototype.AddComponent<SphereCollider>();
+            sphereCol.radius          = 0.5f;
 
-            // Trail
-            var trail          = _flarePrototype.AddComponent<TrailRenderer>();
-            trail.time         = 0.4f;
-            trail.startWidth   = 0.04f;
-            trail.endWidth     = 0f;
-            var trailMat       = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            // Thick bright trail — clearly visible arc in flight
+            var trail        = _flarePrototype.AddComponent<TrailRenderer>();
+            trail.time       = 0.6f;
+            trail.startWidth = 0.12f;
+            trail.endWidth   = 0f;
+            var trailMat     = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             trailMat.SetFloat("_Surface", 1f);
-            trailMat.SetColor("_BaseColor", new Color(1f, 0.4f, 0.1f, 0.8f));
-            trail.material     = trailMat;
+            trailMat.SetColor("_BaseColor", new Color(1f, 0.5f, 0f, 1f));
+            trail.material   = trailMat;
 
             // Logic
             _flarePrototype.AddComponent<FlareProjectile>();
@@ -317,14 +430,35 @@ namespace CelestiaVR.Island
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
+        private static Vector3 GetSpawnInFront(float distanceMetres)
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                var xrOrigin = GameObject.Find("XR Origin Hands (XR Rig)");
+                if (xrOrigin == null) xrOrigin = GameObject.Find("XR Origin (XR Rig)");
+                if (xrOrigin == null) xrOrigin = GameObject.Find("XR Origin");
+                if (xrOrigin != null) cam = xrOrigin.GetComponentInChildren<Camera>();
+            }
+            if (cam == null) return Vector3.zero;
+
+            var forward = cam.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
+            forward.Normalize();
+
+            var pos = cam.transform.position + forward * distanceMetres;
+            pos.y = 0f;
+            return pos;
+        }
+
         private Vector3 AnchorPos(Vector3 offset) =>
             islandAnchor != null ? islandAnchor.TransformPoint(offset) : offset;
 
-        private bool ValidateGLBs()
+        private bool ValidateCore()
         {
             bool ok = true;
             if (fireplaceGlb == null) { Debug.LogError("[FireplaceBootstrap] fireplaceGlb not assigned."); ok = false; }
-            if (stickGlb     == null) { Debug.LogError("[FireplaceBootstrap] stickGlb not assigned.");     ok = false; }
             if (flareGunGlb  == null) { Debug.LogError("[FireplaceBootstrap] flareGunGlb not assigned.");  ok = false; }
             return ok;
         }

@@ -21,7 +21,7 @@ namespace CelestiaVR.UI
     ///   • FIND IN SKY — Scrollable search list (all celestial bodies)
     ///
     /// Open/close with Left X button.
-    /// Interact via right-controller ray + trigger (instant) or gaze + 0.1 s dwell.
+    /// Interact via right-controller ray + trigger (instant) or gaze + 0.6 s dwell.
     /// Scroll with right thumbstick Y.
     ///
     /// Auto-created by StargazingSceneBootstrap.
@@ -566,11 +566,11 @@ namespace CelestiaVR.UI
 
             // Dwell fallback
             _dwellTimer += Time.deltaTime;
-            float t = _dwellTimer / 0.1f;
+            float t = _dwellTimer / 0.6f;
             var e = _buttons[_hoveredIndex];
             if (e.bgImage != null) e.bgImage.color = Color.Lerp(ColItemBg, ColItemBgHov, t);
 
-            if (_dwellTimer >= 0.1f) { _dwellTimer=0f; Activate(_hoveredIndex); }
+            if (_dwellTimer >= 0.6f) { _dwellTimer=0f; Activate(_hoveredIndex); }
         }
 
         private void Activate(int index)
@@ -648,7 +648,7 @@ namespace CelestiaVR.UI
             _inspectBtnBg.color = ins ? ColActiveModeBtn : ColIdleModeBtn;
         }
 
-        private void RefreshToggleDots()
+        public void RefreshToggleDots()
         {
             var ldr   = StellariumLoader.Instance;
             var lmgr  = SkyLabelManager.Instance;

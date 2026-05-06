@@ -21,15 +21,15 @@ namespace CelestiaVR.UI
 
         [Header("Appearance")]
         [Tooltip("Visual ring diameter in degrees of arc.")]
-        public float angularSizeDeg  = 3.2f;
+        public float angularSizeDeg  = 5.5f;
         [Tooltip("Tick marks extend this fraction of the ring radius beyond the ring edge.")]
-        public float tickOutset      = 0.30f;
+        public float tickOutset      = 0.45f;
         [Tooltip("Pulses per second when idle.")]
         public float pulseFrequency  = 1.0f;
 
-        // Colors
-        private static readonly Color ColIdle  = new Color(0.30f, 0.70f, 1.00f, 1f);
-        private static readonly Color ColFound = new Color(0.20f, 1.00f, 0.45f, 1f);
+        // Colors — vivid orange-gold idle, bright cyan when locked on
+        private static readonly Color ColIdle  = new Color(1.00f, 0.65f, 0.05f, 1f);
+        private static readonly Color ColFound = new Color(0.15f, 1.00f, 0.80f, 1f);
 
         // ── Runtime ──────────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ namespace CelestiaVR.UI
             var ringGO = new GameObject("Ring");
             ringGO.transform.SetParent(_root.transform, false);
             _ringLR = ringGO.AddComponent<LineRenderer>();
-            SetupLR(_ringLR, 64, loop: true, ColIdle, 0.002f);
+            SetupLR(_ringLR, 64, loop: true, ColIdle, 0.005f);
 
             // Four tick marks
             for (int i = 0; i < 4; i++)
@@ -161,7 +161,7 @@ namespace CelestiaVR.UI
                 var tGO = new GameObject($"Tick{i}");
                 tGO.transform.SetParent(_root.transform, false);
                 _tickLRs[i] = tGO.AddComponent<LineRenderer>();
-                SetupLR(_tickLRs[i], 2, loop: false, ColIdle, 0.002f);
+                SetupLR(_tickLRs[i], 2, loop: false, ColIdle, 0.005f);
                 _tickLRs[i].SetPosition(0, Vector3.zero);
                 _tickLRs[i].SetPosition(1, Vector3.up);
             }
