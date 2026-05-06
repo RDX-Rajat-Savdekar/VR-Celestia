@@ -38,6 +38,7 @@ namespace CelestiaVR.Core
             EnsureInputManager();
             EnsureSoundManager();
             EnsureFireplaceMiniGame();
+            EnsureIslandFloor();
 
             Debug.Log("[Bootstrap] Scene ready.");
         }
@@ -358,6 +359,65 @@ namespace CelestiaVR.Core
             go.AddComponent<FireplaceBootstrap>();
             // islandAnchor left null → positions are treated as world-space coordinates directly.
             // Assign islandAnchor in the Inspector if you want island-local offset coordinates.
+        }
+
+        /// <summary>
+        /// The island GLB has no physics mesh, so XRI's CharacterController falls straight
+        /// through it.  This creates a single large invisible BoxCollider that acts as the
+        /// ground plane.  The Y position is derived from the scene's fireplace marker (the
+        /// most reliable indicator of the island surface), falling back to the island root's
+        /// renderer bounds min, and finally to Y=0.
+        /// </summary>
+        private void EnsureIslandFloor()
+        {
+            if (GameObject.Find("[IslandFloor]") != null) return;
+
+            float floorY = DetectIslandFloorY();
+
+            // Invisible BoxCollider slab — catches CharacterController-based locomotion
+            var floorGO = new GameObject("[IslandFloor]");
+            floorGO.transform.position = new Vector3(0f, floorY, 0f);
+            var col    = floorGO.AddComponent<BoxCollider>();
+            col.size   = new Vector3(300f, 0.2f, 300f);
+            col.center = new Vector3(0f, -0.1f, 0f);
+
+            // Hard Y-clamp guard — catches direct transform.position locomotion that
+            // bypasses CharacterController entirely (XRI3 can do both depending on config)
+            var guardGO = new GameObject("[IslandFloorGuard]");
+            var guard   = guardGO.AddComponent<IslandFloorGuard>();
+            guard.overrideFloorY = floorY;
+
+            Debug.Log($"[Bootstrap] Island floor collider + guard added at Y={floorY:F3}");
+        }
+
+        private static float DetectIslandFloorY()
+        {
+            // 1. Designer-placed fireplace marker — most reliable signal for island surface
+            var marker = GameObject.Find("To_Place_Fireplace");
+            if (marker != null) return marker.transform.position.y;
+
+            // 2. Scan for the island root by name and use the bottom of its renderer bounds
+            foreach (var candidate in new[] { "Island", "island", "IslandRoot", "Floating Island" })
+            {
+                var go = GameObject.Find(candidate);
+                if (go == null) continue;
+                var renderers = go.GetComponentsInChildren<Renderer>();
+                if (renderers.Length == 0) continue;
+                var bounds = renderers[0].bounds;
+                foreach (var r in renderers) bounds.Encapsulate(r.bounds);
+                return bounds.min.y;
+            }
+
+            // 3. Use XR Origin's current Y — wherever the designer placed the rig IS the floor
+            foreach (var name in new[] {
+                "XR Origin Hands (XR Rig)", "XR Origin (XR Rig)", "XR Origin" })
+            {
+                var go = GameObject.Find(name);
+                if (go != null) return go.transform.position.y;
+            }
+
+            // 4. Last resort: world Y=0
+            return 0f;
         }
     }
 }
