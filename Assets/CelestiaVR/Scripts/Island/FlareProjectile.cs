@@ -14,7 +14,7 @@ namespace CelestiaVR.Island
     {
         [Header("Safety")]
         [Tooltip("Auto-destroy after this many seconds if no collision.")]
-        public float lifetime = 8f;
+        public float lifetime = 3f;
 
         // Injected by FlareGun at Instantiate time
         [HideInInspector] public FlareGun sourceGun;

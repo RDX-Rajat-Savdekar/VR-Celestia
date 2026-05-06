@@ -371,12 +371,12 @@ namespace CelestiaVR.UI
             _triggerWasDown = trig;
             if (tPressed) { OnRealScaleButtonPressed(); return; }
 
-            // Dwell fallback (1.5 s)
+            // Dwell fallback (0.2 s — quick hold to activate Real Scale / Sky View)
             _btnDwellTimer += Time.deltaTime;
-            float t = _btnDwellTimer / 1.5f;
+            float t = _btnDwellTimer / 0.2f;
             if (_realScaleBtnBg != null)
                 _realScaleBtnBg.color = Color.Lerp(ColBtnIdle, ColBtnHover, t);
-            if (_btnDwellTimer >= 1.5f) { _btnDwellTimer = 0f; OnRealScaleButtonPressed(); }
+            if (_btnDwellTimer >= 0.2f) { _btnDwellTimer = 0f; OnRealScaleButtonPressed(); }
         }
 
         private void ClearBtnHover()
