@@ -39,6 +39,7 @@ namespace CelestiaVR.Core
             EnsureSoundManager();
             EnsureFireplaceMiniGame();
             EnsureIslandFloor();
+            EnsureIslandBoundaryWalls();
 
             Debug.Log("[Bootstrap] Scene ready.");
         }
@@ -368,6 +369,13 @@ namespace CelestiaVR.Core
         /// most reliable indicator of the island surface), falling back to the island root's
         /// renderer bounds min, and finally to Y=0.
         /// </summary>
+        private void EnsureIslandBoundaryWalls()
+        {
+            if (FindFirstObjectByType<IslandBoundaryWalls>() != null) return;
+            var go = new GameObject("[IslandBoundaryWalls]");
+            go.AddComponent<IslandBoundaryWalls>();
+        }
+
         private void EnsureIslandFloor()
         {
             if (GameObject.Find("[IslandFloor]") != null) return;
