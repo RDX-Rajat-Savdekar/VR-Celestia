@@ -378,9 +378,11 @@ namespace CelestiaVR.Island
 
         internal static void FixGLBShaders(GameObject root, float smoothness)
         {
-            var litShader = Shader.Find("Universal Render Pipeline/Lit");
+            var litShader      = Shader.Find("Universal Render Pipeline/Lit");
+            var particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             if (litShader == null) return;
 
+            // ── MeshRenderers ─────────────────────────────────────────────────────
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true))
             {
                 var mats    = r.materials;
@@ -392,6 +394,8 @@ namespace CelestiaVR.Island
                     if (mat == null) continue;
 
                     string shaderName = mat.shader != null ? mat.shader.name : "";
+
+                    // Already URP Lit — just tune properties, leave textures alone
                     if (shaderName == "Universal Render Pipeline/Lit")
                     {
                         mat.SetFloat("_Metallic",   0f);
@@ -400,6 +404,7 @@ namespace CelestiaVR.Island
                         continue;
                     }
 
+                    // Any non-URP shader (including GrabPass shaders) → replace with URP Lit
                     var textures  = SnapshotTextures(mat);
                     Color baseCol = Color.white;
                     if      (mat.HasProperty("_BaseColor"))       baseCol = mat.GetColor("_BaseColor");
@@ -424,6 +429,40 @@ namespace CelestiaVR.Island
                 }
 
                 if (changed) r.materials = mats;
+            }
+
+            // ── ParticleSystemRenderers ───────────────────────────────────────────
+            // Fire/smoke effects often use GrabPass shaders (Built-in RP only) for
+            // heat-distortion.  GrabPass silently breaks in URP — replace every
+            // non-URP particle material with URP Particles/Unlit.
+            if (particleShader == null) return;
+
+            foreach (var psr in root.GetComponentsInChildren<ParticleSystemRenderer>(true))
+            {
+                var mats    = psr.sharedMaterials;
+                bool changed = false;
+
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    var mat = mats[i];
+                    if (mat == null) continue;
+
+                    string sn = mat.shader != null ? mat.shader.name : "";
+                    if (sn.StartsWith("Universal Render Pipeline/")) continue;
+
+                    // Preserve base colour before swapping shader
+                    Color col = Color.white;
+                    if      (mat.HasProperty("_BaseColor")) col = mat.GetColor("_BaseColor");
+                    else if (mat.HasProperty("_Color"))     col = mat.GetColor("_Color");
+                    else if (mat.HasProperty("_TintColor")) col = mat.GetColor("_TintColor");
+
+                    mat.shader = particleShader;
+                    mat.SetFloat("_Surface", 1f); // transparent blending
+                    mat.SetColor("_BaseColor", col);
+                    changed = true;
+                }
+
+                if (changed) psr.sharedMaterials = mats;
             }
         }
 

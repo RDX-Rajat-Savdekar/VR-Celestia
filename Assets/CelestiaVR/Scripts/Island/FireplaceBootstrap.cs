@@ -258,12 +258,6 @@ namespace CelestiaVR.Island
             gunGO.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
             gunGO.transform.localPosition = new Vector3(0f, -0.02f, 0.05f);
 
-            // XR Grab — InstantaneousMovement so the gun snaps to and stays with the hand
-            var grab              = gunGO.AddComponent<XRGrabInteractable>();
-            grab.movementType     = XRBaseInteractable.MovementType.Instantaneous;
-            grab.throwOnDetach    = false;
-            grab.useDynamicAttach = true;
-
             // Muzzle point
             var muzzleGO          = new GameObject("MuzzlePoint");
             muzzleGO.transform.SetParent(gunGO.transform, false);
@@ -294,9 +288,9 @@ namespace CelestiaVR.Island
             }
 
             // 2. Name search inside XR Origin hierarchy
-            var xrOrigin = GameObject.Find("XR Origin Hands (XR Rig)")
-                        ?? GameObject.Find("XR Origin (XR Rig)")
-                        ?? GameObject.Find("XR Origin");
+            var xrOrigin = GameObject.Find("XR Origin Hands (XR Rig)");
+            if (xrOrigin == null) xrOrigin = GameObject.Find("XR Origin (XR Rig)");
+            if (xrOrigin == null) xrOrigin = GameObject.Find("XR Origin");
             if (xrOrigin != null)
             {
                 foreach (var t in xrOrigin.GetComponentsInChildren<Transform>(true))
@@ -384,9 +378,13 @@ namespace CelestiaVR.Island
             DontDestroyOnLoad(_flarePrototype);
 
             // Visual — large bright glowing sphere (impossible to miss)
-            var mf        = _flarePrototype.AddComponent<MeshFilter>();
-            mf.sharedMesh = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
-            var mr        = _flarePrototype.AddComponent<MeshRenderer>();
+            // CreatePrimitive gets the sphere mesh without relying on builtin resource names
+            // (Resources.GetBuiltinResource<Mesh>("Sphere.fbx") returns null in Unity 6)
+            var sphereTemp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            var mf         = _flarePrototype.AddComponent<MeshFilter>();
+            mf.sharedMesh  = sphereTemp.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(sphereTemp);
+            var mr         = _flarePrototype.AddComponent<MeshRenderer>();
             var mat       = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             mat.SetColor("_BaseColor",     new Color(1f, 0.35f, 0f));
             mat.SetColor("_EmissionColor", new Color(4f, 1.2f, 0f));   // very hot glow
