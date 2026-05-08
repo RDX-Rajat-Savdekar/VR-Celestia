@@ -40,6 +40,7 @@ namespace CelestiaVR.Core
             EnsureFireplaceMiniGame();
             EnsureIslandFloor();
             EnsureIslandBoundaryWalls();
+            EnsureOnboarding();
 
             Debug.Log("[Bootstrap] Scene ready.");
         }
@@ -396,6 +397,13 @@ namespace CelestiaVR.Core
             guard.overrideFloorY = floorY;
 
             Debug.Log($"[Bootstrap] Island floor collider + guard added at Y={floorY:F3}");
+        }
+
+        private void EnsureOnboarding()
+        {
+            if (FindFirstObjectByType<OnboardingManager>() != null) return;
+            var go = new GameObject("[OnboardingManager]");
+            go.AddComponent<OnboardingManager>();
         }
 
         private static float DetectIslandFloorY()
