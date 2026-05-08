@@ -240,6 +240,16 @@ namespace CelestiaVR.Core
                 var r = t.GetComponent<Renderer>();
                 if (r != null) r.enabled = false;
             }
+
+            // Catch any remaining ray/pointer LineRenderers on controller hierarchies that
+            // the name-based filter above missed (e.g. the NearFarInteractor orange ray).
+            foreach (var ctrl in FindObjectsByType<
+                UnityEngine.XR.Interaction.Toolkit.ActionBasedController>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                foreach (var lr in ctrl.GetComponentsInChildren<LineRenderer>(true))
+                    lr.enabled = false;
+            }
         }
 
         /// <summary>

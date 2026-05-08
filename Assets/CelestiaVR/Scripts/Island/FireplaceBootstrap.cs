@@ -140,10 +140,9 @@ namespace CelestiaVR.Island
 
             if (spawnImmediately)
             {
-                // Show fireplace model right away and spawn the gun without needing sticks
+                // Show fireplace model right away (gun removed — no longer spawned at start)
                 if (_site != null && _site.fireplaceModel != null)
                     _site.fireplaceModel.SetActive(true);
-                SpawnFlareGun();
             }
         }
 
@@ -455,10 +454,8 @@ namespace CelestiaVR.Island
 
         private bool ValidateCore()
         {
-            bool ok = true;
-            if (fireplaceGlb == null) { Debug.LogError("[FireplaceBootstrap] fireplaceGlb not assigned."); ok = false; }
-            if (flareGunGlb  == null) { Debug.LogError("[FireplaceBootstrap] flareGunGlb not assigned.");  ok = false; }
-            return ok;
+            if (fireplaceGlb == null) { Debug.LogError("[FireplaceBootstrap] fireplaceGlb not assigned."); return false; }
+            return true;
         }
     }
 }
