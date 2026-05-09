@@ -87,6 +87,25 @@ namespace CelestiaVR.Island
             }
         }
 
+        // ── Reset ─────────────────────────────────────────────────────────────────
+
+        public void ResetStick(Vector3 worldPosition)
+        {
+            _deposited              = false;
+            _grab.enabled           = true;
+            _rb.isKinematic         = false;
+            _rb.linearVelocity      = Vector3.zero;
+            _rb.angularVelocity     = Vector3.zero;
+
+            foreach (var col in GetComponentsInChildren<Collider>())
+                col.enabled = true;
+
+            transform.SetParent(null, false);
+            transform.position = worldPosition;
+            transform.rotation = Quaternion.Euler(
+                Random.Range(-8f, 8f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
+        }
+
         // ── Deposit ───────────────────────────────────────────────────────────────
 
         private void Deposit()

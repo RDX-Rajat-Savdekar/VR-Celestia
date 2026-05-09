@@ -52,7 +52,8 @@ namespace CelestiaVR.Island
         [Tooltip("How many wood logs must be deposited before the site can be lit.")]
         public int requiredLogs = 3;
         private int _sticksPlaced = 0;
-        private readonly List<StickCollectible> _sticks = new();
+        private readonly List<StickCollectible> _sticks      = new();
+        private readonly List<Vector3>          _stickOrigins = new();
 
         // Visuals
         private GameObject       _markerRing;
@@ -107,7 +108,10 @@ namespace CelestiaVR.Island
         public void RegisterStick(StickCollectible stick)
         {
             if (!_sticks.Contains(stick))
+            {
                 _sticks.Add(stick);
+                _stickOrigins.Add(stick.transform.position);
+            }
         }
 
         public void OnStickDeposited()
@@ -131,6 +135,10 @@ namespace CelestiaVR.Island
             LightFire();
         }
 
+        [Header("Reset")]
+        [Tooltip("Seconds the fire burns before auto-resetting so logs can be collected again.")]
+        public float fireDuration = 10f;
+
         public void LightFire()
         {
             if (CurrentState == State.Lit) return; // already burning
@@ -152,6 +160,58 @@ namespace CelestiaVR.Island
 
             if (_fireLight != null) _fireLight.enabled = true;
             if (_audio.clip != null) _audio.Play();
+
+            StartCoroutine(ResetAfterDelay());
+        }
+
+        private IEnumerator ResetAfterDelay()
+        {
+            yield return new WaitForSeconds(fireDuration);
+            ResetSite();
+        }
+
+        private void ResetSite()
+        {
+            Debug.Log("[FireplaceSite] Resetting site.");
+
+            // Stop fire VFX
+            if (_smokeVfxInstance != null)
+            {
+                foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                _smokeVfxInstance.SetActive(false);
+            }
+            foreach (var ps in _fireSystems)
+                if (ps != null) { ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); ps.gameObject.SetActive(false); }
+
+            // Stop light and audio
+            if (_fireLight != null) _fireLight.enabled = false;
+            if (_audio.isPlaying) _audio.Stop();
+
+            // Hide fireplace model
+            if (fireplaceModel != null) fireplaceModel.SetActive(false);
+
+            // Reset state BEFORE re-enabling logs so StickCollectible.Update can't auto-deposit
+            _sticksPlaced = 0;
+            CurrentState  = State.Empty;
+
+            // Respawn logs at their original positions, fully reset
+            for (int i = 0; i < _sticks.Count; i++)
+            {
+                var s = _sticks[i];
+                if (s == null) continue;
+                s.gameObject.SetActive(true);
+                s.ResetStick(_stickOrigins[i]);
+                foreach (var r in s.GetComponentsInChildren<Renderer>())
+                {
+                    var c = r.material.color;
+                    c.a = 1f;
+                    r.material.color = c;
+                }
+            }
+
+            // Show marker ring again
+            if (_ringRenderer != null) _ringRenderer.enabled = true;
         }
 
         // ── Transition ────────────────────────────────────────────────────────────
