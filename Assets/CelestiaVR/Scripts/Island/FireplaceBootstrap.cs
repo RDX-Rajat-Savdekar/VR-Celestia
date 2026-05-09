@@ -34,6 +34,8 @@ namespace CelestiaVR.Island
         public GameObject fireplaceGlb;
         public GameObject woodLogGlb;   // Optional dedicated log model; falls back to procedural
         public GameObject flareGunGlb;
+        [Tooltip("Smoke/fire VFX prefab shown when the fire is lit (e.g. VFX_Fire_Floor_01_Smoke).")]
+        public GameObject smokePrefab;
 
         [Header("Testing")]
         [Tooltip("Spawn gun and show fireplace model immediately, skipping stick collection.")]
@@ -135,6 +137,13 @@ namespace CelestiaVR.Island
                 fireplaceOffset + new Vector3( 0.0f, 0f, -1.3f),
             };
 
+            // Auto-find VFX_Fire_Floor_01_Smoke already placed in the scene
+            if (smokePrefab == null)
+            {
+                var vfxInScene = GameObject.Find("VFX_Fire_Floor_01_Smoke");
+                if (vfxInScene != null) smokePrefab = vfxInScene;
+            }
+
             SpawnSite();
             SpawnSticks();
 
@@ -160,6 +169,7 @@ namespace CelestiaVR.Island
 
             _site = siteGO.AddComponent<FireplaceSite>();
             _site.requiredLogs = woodLogOffsets.Length;  // match spawned count
+            _site.smokePrefab  = smokePrefab;
 
             if (fireplaceGlb != null)
             {
