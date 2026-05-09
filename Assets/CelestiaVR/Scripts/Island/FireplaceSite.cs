@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using CelestiaVR.Audio;
+using System;
 
 namespace CelestiaVR.Island
 {
@@ -23,6 +24,8 @@ namespace CelestiaVR.Island
 
         [Header("References (set by FireplaceBootstrap)")]
         public GameObject fireplaceModel;   // small_fire_place GLB instance, inactive until Built
+        [Tooltip("Smoke/fire VFX prefab to instantiate when the fire is lit (e.g. VFX_Fire_Floor_01_Smoke).")]
+        public GameObject smokePrefab;
 
         [Header("Site Zone")]
         [Tooltip("Radius within which a released stick is accepted.")]
@@ -57,7 +60,8 @@ namespace CelestiaVR.Island
         private Material         _ringMat;
 
         // Fire
-        private ParticleSystem[] _fireSystems;  // Flames, Sparks, Embers
+        private ParticleSystem[] _fireSystems;  // particles from the smoke prefab (or empty if none)
+        private GameObject       _smokeVfxInstance;
         private Light            _fireLight;
 
         // Audio
@@ -84,6 +88,11 @@ namespace CelestiaVR.Island
             _audio.volume       = 0.7f;
 
             BuildMarkerRing();
+        }
+
+        private void Start()
+        {
+            // Delayed until Start so smokePrefab can be assigned by FireplaceBootstrap after AddComponent
             BuildFireParticles();
         }
 
@@ -109,6 +118,17 @@ namespace CelestiaVR.Island
 
             if (CurrentState == State.Built)
                 StartCoroutine(TransitionToBuilt());
+            if (CurrentState == State.Built)
+                StartCoroutine(AutoIgniteAfterDelay());
+        }
+
+        private IEnumerator AutoIgniteAfterDelay()
+        {
+            // Wait for the sticks to finish fading out (TransitionToBuilt takes 0.5s)
+            yield return new WaitForSeconds(0.2f);
+            
+            // Automatically light the fire once the model is ready
+            LightFire();
         }
 
         public void LightFire()
@@ -118,8 +138,17 @@ namespace CelestiaVR.Island
             SoundManager.Instance?.Play(SoundEvent.FireIgnite, transform.position);
             Debug.Log("[FireplaceSite] Fire lit!");
 
-            foreach (var ps in _fireSystems)
-                if (ps != null) { ps.gameObject.SetActive(true); ps.Play(); }
+            if (_smokeVfxInstance != null)
+            {
+                _smokeVfxInstance.SetActive(true);
+                foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
+                    ps.Play();
+            }
+            else
+            {
+                foreach (var ps in _fireSystems)
+                    if (ps != null) { ps.gameObject.SetActive(true); ps.Play(); }
+            }
 
             if (_fireLight != null) _fireLight.enabled = true;
             if (_audio.clip != null) _audio.Play();
@@ -210,154 +239,27 @@ namespace CelestiaVR.Island
 
         private void BuildFireParticles()
         {
-            _fireSystems = new ParticleSystem[3];
-            _fireSystems[0] = BuildFlames();
-            _fireSystems[1] = BuildSparks();
-            _fireSystems[2] = BuildEmbers();
+            if (smokePrefab != null)
+            {
+                // If it's already a scene object, reparent it; otherwise instantiate from prefab asset
+                bool isSceneObject = smokePrefab.scene.IsValid();
+                _smokeVfxInstance = isSceneObject
+                    ? smokePrefab
+                    : Instantiate(smokePrefab, transform);
+
+                _smokeVfxInstance.transform.SetParent(transform, false);
+                _smokeVfxInstance.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+                _smokeVfxInstance.SetActive(false);
+                // Stop all child particle systems so they don't auto-play before LightFire()
+                foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                _fireSystems = Array.Empty<ParticleSystem>();
+            }
+            else
+            {
+                _fireSystems = Array.Empty<ParticleSystem>();
+            }
             BuildFireLight();
-        }
-
-        private ParticleSystem BuildFlames()
-        {
-            var go = new GameObject("PS_Flames");
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0.15f, 0f);
-            go.SetActive(false);
-
-            var ps   = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.loop            = true;
-            main.startLifetime   = new ParticleSystem.MinMaxCurve(0.6f, 1.2f);
-            main.startSpeed      = new ParticleSystem.MinMaxCurve(0.3f, 0.8f);
-            main.startSize       = new ParticleSystem.MinMaxCurve(0.08f, 0.20f);
-            main.startColor      = new ParticleSystem.MinMaxGradient(
-                new Color(1f, 0.3f, 0f, 0.9f), new Color(1f, 0.75f, 0.1f, 0.7f));
-            main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.1f);
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles    = 80;
-
-            var em = ps.emission;
-            em.rateOverTime = 25f;
-
-            var sh = ps.shape;
-            sh.enabled    = true;
-            sh.shapeType  = ParticleSystemShapeType.Cone;
-            sh.angle      = 15f;
-            sh.radius     = 0.08f;
-
-            var sol  = ps.sizeOverLifetime;
-            sol.enabled = true;
-            var curve = new AnimationCurve(
-                new Keyframe(0f, 0.3f), new Keyframe(0.4f, 1f), new Keyframe(1f, 0f));
-            sol.size = new ParticleSystem.MinMaxCurve(1f, curve);
-
-            var col    = ps.colorOverLifetime;
-            col.enabled = true;
-            var grad    = new Gradient();
-            grad.SetKeys(
-                new[] {
-                    new GradientColorKey(new Color(1f, 0.2f, 0f), 0f),
-                    new GradientColorKey(new Color(1f, 0.7f, 0.1f), 0.5f),
-                    new GradientColorKey(new Color(0.9f, 0.9f, 0.5f), 1f) },
-                new[] {
-                    new GradientAlphaKey(0.9f, 0f),
-                    new GradientAlphaKey(0.7f, 0.5f),
-                    new GradientAlphaKey(0f,   1f) });
-            col.color = new ParticleSystem.MinMaxGradient(grad);
-
-            var rend = ps.GetComponent<ParticleSystemRenderer>();
-            rend.renderMode = ParticleSystemRenderMode.Billboard;
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
-            mat.SetFloat("_Surface", 1f);
-            mat.SetColor("_BaseColor", Color.white);
-            rend.material = mat;
-
-            return ps;
-        }
-
-        private ParticleSystem BuildSparks()
-        {
-            var go = new GameObject("PS_Sparks");
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0.2f, 0f);
-            go.SetActive(false);
-
-            var ps   = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.loop            = true;
-            main.startLifetime   = new ParticleSystem.MinMaxCurve(1f, 2.5f);
-            main.startSpeed      = new ParticleSystem.MinMaxCurve(0.5f, 2f);
-            main.startSize       = new ParticleSystem.MinMaxCurve(0.01f, 0.03f);
-            main.startColor      = new Color(1f, 0.85f, 0.3f, 1f);
-            main.gravityModifier = new ParticleSystem.MinMaxCurve(0.3f);
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles    = 40;
-
-            var em = ps.emission;
-            em.rateOverTime = 8f;
-
-            var sh = ps.shape;
-            sh.enabled   = true;
-            sh.shapeType = ParticleSystemShapeType.Cone;
-            sh.angle     = 25f;
-            sh.radius    = 0.05f;
-
-            var vel = ps.velocityOverLifetime;
-            vel.enabled = true;
-            vel.x = new ParticleSystem.MinMaxCurve(-0.3f, 0.3f);
-            vel.z = new ParticleSystem.MinMaxCurve(-0.3f, 0.3f);
-
-            var rend = ps.GetComponent<ParticleSystemRenderer>();
-            rend.renderMode = ParticleSystemRenderMode.Billboard;
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
-            mat.SetFloat("_Surface", 1f);
-            mat.SetColor("_BaseColor", new Color(1f, 0.85f, 0.3f, 1f));
-            rend.material = mat;
-
-            return ps;
-        }
-
-        private ParticleSystem BuildEmbers()
-        {
-            var go = new GameObject("PS_Embers");
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0.25f, 0f);
-            go.SetActive(false);
-
-            var ps   = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.loop            = true;
-            main.startLifetime   = new ParticleSystem.MinMaxCurve(2f, 4f);
-            main.startSpeed      = new ParticleSystem.MinMaxCurve(0.1f, 0.25f);
-            main.startSize       = new ParticleSystem.MinMaxCurve(0.06f, 0.15f);
-            main.startColor      = new Color(0.2f, 0.2f, 0.2f, 0.3f);
-            main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.05f);
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles    = 30;
-
-            var em = ps.emission;
-            em.rateOverTime = 4f;
-
-            var sh = ps.shape;
-            sh.enabled   = true;
-            sh.shapeType = ParticleSystemShapeType.Cone;
-            sh.angle     = 20f;
-            sh.radius    = 0.06f;
-
-            var noise = ps.noise;
-            noise.enabled      = true;
-            noise.strength     = new ParticleSystem.MinMaxCurve(0.3f);
-            noise.frequency    = 0.5f;
-            noise.scrollSpeed  = new ParticleSystem.MinMaxCurve(0.1f);
-
-            var rend = ps.GetComponent<ParticleSystemRenderer>();
-            rend.renderMode = ParticleSystemRenderMode.Billboard;
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
-            mat.SetFloat("_Surface", 1f);
-            mat.SetColor("_BaseColor", new Color(0.3f, 0.3f, 0.3f, 0.4f));
-            rend.material = mat;
-
-            return ps;
         }
 
         private void BuildFireLight()
