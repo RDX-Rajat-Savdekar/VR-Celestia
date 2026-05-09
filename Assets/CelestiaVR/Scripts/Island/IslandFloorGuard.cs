@@ -41,7 +41,7 @@ namespace CelestiaVR.Island
         {
             if (_xrOrigin == null) return;
             var pos = _xrOrigin.position;
-            if (pos.y < _floorY)
+            if (pos.y != _floorY)
             {
                 pos.y = _floorY;
                 _xrOrigin.position = pos;

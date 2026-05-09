@@ -130,9 +130,9 @@ namespace CelestiaVR.Island
             // Logs: scattered in a loose ring around the fireplace
             woodLogOffsets = new Vector3[]
             {
-                fireplaceOffset + new Vector3(-1.2f, 0f,  0.5f),
-                fireplaceOffset + new Vector3( 1.2f, 0f,  0.3f),
-                fireplaceOffset + new Vector3( 0.0f, 0f, -1.3f),
+                fireplaceOffset + new Vector3(-1.4f, 0f,  0.5f),
+                fireplaceOffset + new Vector3( 1.4f, 0f,  0.3f),
+                fireplaceOffset + new Vector3( 0.0f, 0f, -1.5f),
             };
 
             SpawnSite();
