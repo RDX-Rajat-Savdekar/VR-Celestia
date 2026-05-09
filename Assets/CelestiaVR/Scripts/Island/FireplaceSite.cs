@@ -52,16 +52,14 @@ namespace CelestiaVR.Island
         [Tooltip("How many wood logs must be deposited before the site can be lit.")]
         public int requiredLogs = 3;
         private int _sticksPlaced = 0;
-        private readonly List<StickCollectible> _sticks      = new();
+        private readonly List<StickCollectible> _sticks       = new();
         private readonly List<Vector3>          _stickOrigins = new();
-
         // Visuals
         private GameObject       _markerRing;
         private MeshRenderer     _ringRenderer;
         private Material         _ringMat;
 
         // Fire
-        private ParticleSystem[] _fireSystems;  // particles from the smoke prefab (or empty if none)
         private GameObject       _smokeVfxInstance;
         private Light            _fireLight;
 
@@ -118,33 +116,48 @@ namespace CelestiaVR.Island
         {
             _sticksPlaced++;
             CurrentState = _sticksPlaced < requiredLogs ? State.Gathering : State.Built;
-            Debug.Log($"[FireplaceSite] Logs: {_sticksPlaced}/{requiredLogs}  State: {CurrentState}");
 
             if (CurrentState == State.Built)
-                StartCoroutine(TransitionToBuilt());
-            if (CurrentState == State.Built)
-                StartCoroutine(AutoIgniteAfterDelay());
+                StartCoroutine(BuiltSequence());
         }
 
-        private IEnumerator AutoIgniteAfterDelay()
+        private IEnumerator BuiltSequence()
         {
-            // Wait for the sticks to finish fading out (TransitionToBuilt takes 0.5s)
-            yield return new WaitForSeconds(0.2f);
-            
-            // Automatically light the fire once the model is ready
-            LightFire();
-        }
+            // --- Step 1: fade sticks out over 0.5s ---
+            float t = 0f;
+            var renderers = new List<(Renderer r, Color baseCol)>();
+            foreach (var s in _sticks)
+                if (s != null)
+                    foreach (var r in s.GetComponentsInChildren<Renderer>())
+                        renderers.Add((r, r.material.color));
 
-        [Header("Reset")]
-        [Tooltip("Seconds the fire burns before auto-resetting so logs can be collected again.")]
-        public float fireDuration = 10f;
+            while (t < 1f)
+            {
+                t += Time.deltaTime / 0.5f;
+                foreach (var (r, col) in renderers)
+                {
+                    if (r == null) continue;
+                    var c = col; c.a = Mathf.Lerp(1f, 0f, t);
+                    r.material.color = c;
+                }
+                yield return null;
+            }
 
-        public void LightFire()
-        {
-            if (CurrentState == State.Lit) return; // already burning
+            // --- Step 2: hide sticks, show fireplace model, hide ring ---
+            foreach (var s in _sticks)
+                if (s != null) s.gameObject.SetActive(false);
+
+            if (fireplaceModel != null)
+            {
+                foreach (var rb in fireplaceModel.GetComponentsInChildren<Rigidbody>())
+                    Destroy(rb);
+                fireplaceModel.SetActive(true);
+            }
+            if (_ringRenderer != null) _ringRenderer.enabled = false;
+
+            // --- Step 3: light the fire ---
             CurrentState = State.Lit;
             SoundManager.Instance?.Play(SoundEvent.FireIgnite, transform.position);
-            Debug.Log("[FireplaceSite] Fire lit!");
 
             if (_smokeVfxInstance != null)
             {
@@ -152,50 +165,41 @@ namespace CelestiaVR.Island
                 foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
                     ps.Play();
             }
-            else
-            {
-                foreach (var ps in _fireSystems)
-                    if (ps != null) { ps.gameObject.SetActive(true); ps.Play(); }
-            }
-
             if (_fireLight != null) _fireLight.enabled = true;
             if (_audio.clip != null) _audio.Play();
 
-            StartCoroutine(ResetAfterDelay());
-        }
-
-        private IEnumerator ResetAfterDelay()
-        {
+            // --- Step 4: burn for fireDuration, then reset ---
             yield return new WaitForSeconds(fireDuration);
+
             ResetSite();
         }
 
+        [Header("Reset")]
+        [Tooltip("Seconds the fire burns before resetting.")]
+        public float fireDuration = 10f;
+
         private void ResetSite()
         {
-            Debug.Log("[FireplaceSite] Resetting site.");
+            StopAllCoroutines();
 
-            // Stop fire VFX
+            // Kill fire visuals
             if (_smokeVfxInstance != null)
             {
                 foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
                     ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 _smokeVfxInstance.SetActive(false);
             }
-            foreach (var ps in _fireSystems)
-                if (ps != null) { ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); ps.gameObject.SetActive(false); }
-
-            // Stop light and audio
             if (_fireLight != null) _fireLight.enabled = false;
-            if (_audio.isPlaying) _audio.Stop();
+            if (_audio.isPlaying)   _audio.Stop();
 
             // Hide fireplace model
             if (fireplaceModel != null) fireplaceModel.SetActive(false);
 
-            // Reset state BEFORE re-enabling logs so StickCollectible.Update can't auto-deposit
+            // Reset state FIRST so StickCollectible.Update can't auto-deposit on re-enable
             _sticksPlaced = 0;
             CurrentState  = State.Empty;
 
-            // Respawn logs at their original positions, fully reset
+            // Return logs to original positions
             for (int i = 0; i < _sticks.Count; i++)
             {
                 var s = _sticks[i];
@@ -204,62 +208,15 @@ namespace CelestiaVR.Island
                 s.ResetStick(_stickOrigins[i]);
                 foreach (var r in s.GetComponentsInChildren<Renderer>())
                 {
-                    var c = r.material.color;
-                    c.a = 1f;
+                    var c = r.material.color; c.a = 1f;
                     r.material.color = c;
                 }
             }
 
-            // Show marker ring again
+            // Show ring
             if (_ringRenderer != null) _ringRenderer.enabled = true;
         }
 
-        // ── Transition ────────────────────────────────────────────────────────────
-
-        private IEnumerator TransitionToBuilt()
-        {
-            // 1. Fade out sticks
-            float t = 0f;
-            var renderers = new List<(Renderer r, Color baseCol)>();
-            foreach (var s in _sticks)
-            {
-                if (s == null) continue;
-                foreach (var r in s.GetComponentsInChildren<Renderer>())
-                    renderers.Add((r, r.material.color));
-            }
-
-            while (t < 1f)
-            {
-                t += Time.deltaTime / 0.5f;
-                foreach (var (r, col) in renderers)
-                {
-                    if (r == null) continue;
-                    var c = col;
-                    c.a = Mathf.Lerp(1f, 0f, t);
-                    r.material.color = c;
-                }
-                yield return null;
-            }
-
-            // 2. Disable sticks
-            foreach (var s in _sticks)
-                if (s != null) s.gameObject.SetActive(false);
-
-            // 3. Show fireplace model — destroy any Rigidbodies so it doesn't fall
-            //    (island GLB has no physics mesh; gravity would send it to the ocean floor)
-            if (fireplaceModel != null)
-            {
-                foreach (var rb in fireplaceModel.GetComponentsInChildren<Rigidbody>())
-                    Destroy(rb);
-                fireplaceModel.SetActive(true);
-            }
-
-            // 4. Hide ring
-            if (_ringRenderer != null) _ringRenderer.enabled = false;
-
-            // Flare gun is already in the scene from the start (spawned by FireplaceBootstrap).
-            // Fire can now be lit by shooting the site with the flare gun.
-        }
 
         // ── Visuals ───────────────────────────────────────────────────────────────
 
@@ -309,15 +266,17 @@ namespace CelestiaVR.Island
 
                 _smokeVfxInstance.transform.SetParent(transform, false);
                 _smokeVfxInstance.transform.localPosition = new Vector3(0f, 0.15f, 0f);
-                _smokeVfxInstance.SetActive(false);
-                // Stop all child particle systems so they don't auto-play before LightFire()
+                // Disable playOnAwake so SetActive(true) never auto-replays the VFX
                 foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    var main = ps.main;
+                    main.playOnAwake = false;
                     ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                _fireSystems = Array.Empty<ParticleSystem>();
+                }
+                _smokeVfxInstance.SetActive(false);
             }
             else
             {
-                _fireSystems = Array.Empty<ParticleSystem>();
             }
             BuildFireLight();
         }
