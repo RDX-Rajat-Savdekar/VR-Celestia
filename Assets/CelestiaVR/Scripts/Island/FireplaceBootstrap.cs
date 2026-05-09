@@ -178,11 +178,12 @@ namespace CelestiaVR.Island
                 logGO.transform.rotation = Quaternion.Euler(
                     Random.Range(-8f, 8f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
 
-                var rb            = logGO.AddComponent<Rigidbody>();
-                rb.mass           = 1.2f;
-                rb.linearDamping  = 0.6f;
-                rb.angularDamping = 1.2f;
-                rb.useGravity     = false;
+                var rb              = logGO.AddComponent<Rigidbody>();
+                rb.mass             = 1.2f;
+                rb.linearDamping    = 0.6f;
+                rb.angularDamping   = 1.2f;
+                rb.useGravity       = true;
+                rb.freezeRotation   = true;
 
                 var col       = logGO.AddComponent<CapsuleCollider>();
                 col.height    = 0.38f;
