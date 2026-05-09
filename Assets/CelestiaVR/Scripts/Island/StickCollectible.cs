@@ -30,6 +30,7 @@ namespace CelestiaVR.Island
         private XRGrabInteractable _grab;
         private Rigidbody          _rb;
         private bool               _deposited = false;
+        private float              _depositCooldown = 0f;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ namespace CelestiaVR.Island
 
         private void Update()
         {
-            // Backup: a rolling stick that comes to rest inside the zone still counts.
+            if (_depositCooldown > 0f) { _depositCooldown -= Time.deltaTime; return; }
             if (_deposited || _rb.isKinematic || targetSite == null) return;
             if (targetSite.CurrentState >= FireplaceSite.State.Built) return;
 
@@ -85,6 +86,29 @@ namespace CelestiaVR.Island
             {
                 Deposit();
             }
+        }
+
+        // ── Reset ─────────────────────────────────────────────────────────────────
+
+        public void ResetStick(Vector3 worldPosition)
+        {
+            _deposited       = false;
+            _depositCooldown = 2f;
+            _grab.enabled    = true;
+
+            // Stay kinematic with zero velocity while we reposition, then release
+            _rb.isKinematic     = true;
+            _rb.linearVelocity  = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+
+            foreach (var col in GetComponentsInChildren<Collider>())
+                col.enabled = true;
+
+            transform.SetParent(null, false);
+            transform.position = worldPosition;
+            transform.rotation = Quaternion.identity;
+
+            _rb.isKinematic = false;
         }
 
         // ── Deposit ───────────────────────────────────────────────────────────────
