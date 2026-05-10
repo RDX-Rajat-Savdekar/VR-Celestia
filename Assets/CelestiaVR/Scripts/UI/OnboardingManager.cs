@@ -42,6 +42,11 @@ namespace CelestiaVR.UI
                 "A", "A Button  —  Select",
                 "Press A while looking at\na glowing pink star\nto select and inspect it."
             ),
+            new StepData(
+                new Color(1.00f, 0.45f, 0.10f),
+                "🪵", "Fireplace  —  Light a Fire",
+                "Find the 3 logs scattered\naround the island.\nGrab each log and drop it\nonto the glowing ring\nto build the fireplace."
+            ),
         };
 
         // ── Layout constants (canvas units; 1 unit = 1 mm at scale 0.001) ─────────
