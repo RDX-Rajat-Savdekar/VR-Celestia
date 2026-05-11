@@ -9,6 +9,7 @@ using CelestiaVR.Audio;
 using CelestiaVR.Environment;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
+using UnityEngine.XR.Interaction.Toolkit.Locomotion.Comfort;
 
 namespace CelestiaVR.Core
 {
@@ -26,6 +27,7 @@ namespace CelestiaVR.Core
             DisableSceneLights();
             FixCamera();
             DisableGazeInteractor();
+            DisableTunnelingVignette();
             DisableTurnAndTeleport();
             DisableXRInteractorVisuals();
             DisableAffordanceSystem();
@@ -160,6 +162,15 @@ namespace CelestiaVR.Core
                 // Disable the GO if it's purely the gaze interactor
                 if (t.name.Contains("Gaze Interactor") || t.name.Contains("Eye Gaze"))
                     t.gameObject.SetActive(false);
+            }
+        }
+
+        private void DisableTunnelingVignette()
+        {
+            foreach (var vc in FindObjectsByType<TunnelingVignetteController>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                vc.gameObject.SetActive(false);
             }
         }
 

@@ -38,6 +38,10 @@ namespace CelestiaVR.Interaction
             if (glowRingPrefab != null)
             {
                 _glowInstance = Instantiate(glowRingPrefab);
+                // Match the pink used by BillboardStarDwellDetector's proxy glow
+                var rend = _glowInstance.GetComponentInChildren<Renderer>(true);
+                if (rend != null)
+                    rend.material.color = new Color(1f, 0.3f, 0.7f, 0.18f);
                 _glowInstance.SetActive(false);
             }
         }

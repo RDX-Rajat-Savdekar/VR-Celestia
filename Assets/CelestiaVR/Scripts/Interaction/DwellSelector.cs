@@ -71,6 +71,8 @@ namespace CelestiaVR.Interaction
         private CelestialBody _softwareTarget;
         private bool _softwareInjectedThisFrame;
 
+        private ActionBasedController _rightController;
+
         /// <summary>
         /// Called by BillboardStarDwellDetector each frame when a billboard star is
         /// within gaze tolerance. If no physics target is found, this becomes the active target.
@@ -89,6 +91,16 @@ namespace CelestiaVR.Interaction
 
             if (gazeCamera == null)
                 Debug.LogError("[DwellSelector] No gaze camera found! Assign Main Camera in Inspector.");
+
+            foreach (var ctrl in FindObjectsByType<ActionBasedController>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (ctrl.name.ToLower().Contains("right"))
+                {
+                    _rightController = ctrl;
+                    break;
+                }
+            }
         }
 
         private void Update()
@@ -136,6 +148,7 @@ namespace CelestiaVR.Interaction
                 if (_dwellAccumulator >= dwellTime)
                 {
                     SoundManager.Instance?.Play(SoundEvent.Select, _currentTarget.transform.position);
+                    _rightController?.SendHapticImpulse(0.4f, 0.15f);
                     OnDwellSelect?.Invoke(_currentTarget);
                     _dwellAccumulator = 0f; // prevent repeat firing
                 }

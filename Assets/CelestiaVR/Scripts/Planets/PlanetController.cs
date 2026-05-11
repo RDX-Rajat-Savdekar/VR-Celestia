@@ -123,9 +123,10 @@ namespace CelestiaVR.Planets
                 var existingCol = go.GetComponent<Collider>();
                 if (existingCol != null) Destroy(existingCol);
                 var col = go.AddComponent<SphereCollider>();
-                // Target a world-space hit radius of ~6 units so gaze doesn't need to be
-                // pixel-precise. Divide by effectiveScale to get the local-space radius.
-                col.radius = Mathf.Max(2f, 6f / Mathf.Max(0.001f, effectiveScale));
+                // Wide snap-zone: target 14 world-space units so gaze lands on the
+                // planet comfortably without pixel-precision. Divide by effectiveScale
+                // to get the local-space radius the collider needs.
+                col.radius = Mathf.Max(8f, 25f / Mathf.Max(0.001f, effectiveScale));
 
                 // Parse ephemeris
                 var ephemeris = entry.ephemerisFile != null

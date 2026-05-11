@@ -376,7 +376,7 @@ namespace CelestiaVR.UI
                     _realScaleBtnBg.color = Color.Lerp(ColBtnIdle, ColBtnHover, holdFill);
                 if (_triggerHoldTimer >= 0.5f)
                 {
-                    _triggerHoldTimer = 0f;
+                    _triggerHoldTimer = float.MaxValue; // block re-fire until trigger released
                     _btnDwellTimer    = 0f;
                     OnRealScaleButtonPressed();
                 }
