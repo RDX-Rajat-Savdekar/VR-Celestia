@@ -176,7 +176,7 @@ namespace CelestiaVR.Island
 
         [Header("Reset")]
         [Tooltip("Seconds the fire burns before resetting.")]
-        public float fireDuration = 10f;
+        public float fireDuration = 17f;
 
         private void ResetSite()
         {
@@ -265,7 +265,7 @@ namespace CelestiaVR.Island
                     : Instantiate(smokePrefab, transform);
 
                 _smokeVfxInstance.transform.SetParent(transform, false);
-                _smokeVfxInstance.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+                _smokeVfxInstance.transform.localPosition = new Vector3(0f, 0.33f, 0f);
                 // Disable playOnAwake so SetActive(true) never auto-replays the VFX
                 foreach (var ps in _smokeVfxInstance.GetComponentsInChildren<ParticleSystem>(true))
                 {

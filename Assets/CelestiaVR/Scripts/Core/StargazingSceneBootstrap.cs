@@ -6,6 +6,7 @@ using CelestiaVR.UI;
 using CelestiaVR.Constellations;
 using CelestiaVR.Island;
 using CelestiaVR.Audio;
+using CelestiaVR.Environment;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
@@ -38,6 +39,7 @@ namespace CelestiaVR.Core
             EnsureInputManager();
             EnsureSoundManager();
             EnsureFireplaceMiniGame();
+            EnsureFireCampDimmer();
             EnsureIslandFloor();
             EnsureIslandBoundaryWalls();
             EnsureOnboarding();
@@ -407,6 +409,17 @@ namespace CelestiaVR.Core
             guard.overrideFloorY = floorY;
 
             Debug.Log($"[Bootstrap] Island floor collider + guard added at Y={floorY:F3}");
+        }
+
+        private void EnsureFireCampDimmer()
+        {
+            if (FindFirstObjectByType<FireCampGlowDimmer>() != null) return;
+            var go = new GameObject("[FireCampGlowDimmer]");
+            var dimmer = go.AddComponent<FireCampGlowDimmer>();
+#if UNITY_EDITOR
+            dimmer.fogPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Vefects/Free Fire VFX URP/Fog/Gray Volume Fog.prefab");
+#endif
         }
 
         private void EnsureOnboarding()
