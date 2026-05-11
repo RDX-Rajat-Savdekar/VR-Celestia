@@ -184,7 +184,7 @@ namespace CelestiaVR.Interaction
             glow.name = "Glow";
             glow.transform.SetParent(_proxyGO.transform, false);
             glow.transform.localScale = Vector3.one * 4.8f;
-            ApplyAdditiveMat(glow.GetComponent<Renderer>(), new Color(0.8f, 0.9f, 1f, 0.12f));
+            ApplyAdditiveMat(glow.GetComponent<Renderer>(), new Color(1f, 0.3f, 0.7f, 0.18f));
             Destroy(glow.GetComponent<Collider>());
 
             // Collider exists only so HighlightEffect's localScale.x reference is valid;

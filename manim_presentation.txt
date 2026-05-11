@@ -1,0 +1,786 @@
+================================================================================
+  CELESTIAVR — MANIM PRESENTATION REFERENCE
+  Final Presentation: May 11, 2026 | Live Demo 2–4pm | 7–9 min target
+================================================================================
+
+This file is a self-contained reference for generating Manim animation scenes
+for the CelestiaVR final presentation. It contains the full project story,
+every technical decision, all candidate scenes, and detailed prompts for the
+6 finalised scenes.
+
+--------------------------------------------------------------------------------
+SECTION 1: PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+
+CelestiaVR is a VR stargazing app built for the Meta Quest 3 as a 6-week
+university course project (AR/VR course). It lets users stand on a tropical
+island at night and explore the real night sky — gazing at stars to inspect
+them, viewing constellations with stick figures and Stellarium artwork,
+watching planets in their real positions, and interacting with a fireplace
+mini-game.
+
+Tech stack:
+  - Unity 6000.3.11f1
+  - XR Interaction Toolkit 3.3.1
+  - OpenXR + Android XR (Meta Quest 3)
+  - Universal Render Pipeline (URP) 17.3.0
+  - C# scripts in Assets/CelestiaVR/Scripts/
+
+Key data sources:
+  - HYG Star Database v4.2 (hyg_v42.csv) — 119,000+ stars with RA, Dec,
+    magnitude, B-V color index, spectral type, distance in parsecs
+  - NASA/ESO Milky Way panorama (eso0932a.jpg, 7.8MB JPG)
+  - StarNetv2CLI_MacOS — AI tool to remove point stars from the image
+  - NASA Horizons ephemeris TXT files — planet positions over time
+  - Stellarium open-source constellation data (index.json, CC-BY-SA)
+    — HIP star pair arrays for 88 IAU constellations
+    — 3-anchor pixel-mapped art placement data for 85 constellations
+    — Constellation artwork PNGs (85 images)
+
+--------------------------------------------------------------------------------
+SECTION 2: FULL DEVELOPMENT TIMELINE & TECHNICAL DECISIONS
+--------------------------------------------------------------------------------
+
+Every decision, mistake, and learning in chronological order:
+
+── ACT 1: THE SKY BACKGROUND ──────────────────────────────────────────────────
+
+DECISION 1 — Unity default 6-sided cubemap skybox
+  What: Standard Unity skybox using 6 face textures (cube map).
+  Why tried: It's the default Unity approach for any sky background.
+  Problem: When mapping an equirectangular (panoramic) image to a cubemap,
+           the poles (top/bottom faces) get extreme distortion. The Milky Way
+           band, which runs diagonally, would warp badly near the poles.
+           Any 4K image looks wrong — it's a fundamental cubemap limitation,
+           not a resolution issue.
+  Outcome: Abandoned.
+
+DECISION 2 — Custom SkySphere with inverted normals
+  What: A procedurally generated sphere mesh (radius 500 Unity units) where
+        all face normals are flipped inward, so the texture is visible from
+        inside. The equirectangular panorama maps directly onto it with no
+        reprojection artifacts.
+  Why it works: Spherical mapping of an equirectangular image is the native
+                format — no pole distortion, no seams.
+  File: Assets/CelestiaVR/Scripts/Core/SkySphere.cs
+  Code detail: mesh.normals[i] = -normals[i] for all vertices.
+
+DECISION 3 — NASA/ESO Milky Way image has baked-in point stars
+  What: The source image (eso0932a.jpg) is a real photograph of the Milky Way.
+        It contains actual photographic star pixels baked into the texture.
+  Problem: If we also render programmatic stars (from the HYG catalog) at the
+           correct positions, stars near the galactic plane appear twice — once
+           as a blurry pixel in the texture, and once as a crisp glowing
+           billboard. Looks wrong.
+  Outcome: Needed to remove the point stars from the image.
+
+DECISION 4 — StarNetv2CLI_MacOS to strip point stars
+  What: StarNet is an AI-based tool (neural network) that separates point
+        sources (stars) from diffuse nebulosity (gas, dust clouds) in
+        astronomical images. We ran the NASA/ESO image through it.
+  Tool: StarNetv2CLI_MacOS (command-line binary, run locally)
+  Input: eso0932a.jpg (7.8MB, full Milky Way panorama with stars)
+  Output: milkyway_gas_only.tif (46MB TIF, only gas/dust clouds remain)
+  Result: The SkySphere now shows only nebulosity — all point stars in the
+          sky come exclusively from our programmatic HYG catalog rendering.
+  File: Assets/CelestiaVR_resources/MilkyWay/milkyway_gas_only.tif
+
+── ACT 2: THE STAR CATALOG ────────────────────────────────────────────────────
+
+DECISION 5 — HYG Star Database
+  What: The HYG v4.2 catalog (Henry Draper + Yale + Gliese merged) contains
+        119,000+ stars with:
+          - Hipparcos ID (HIP)
+          - RA (right ascension) in decimal hours
+          - Dec (declination) in degrees
+          - Apparent magnitude (brightness as seen from Earth)
+          - B-V color index (astrophysical temperature proxy)
+          - Spectral type
+          - Distance in parsecs
+          - Proper name (for ~300 stars)
+  File: Assets/Data/hyg_v42.csv (32MB CSV)
+  Parser: Assets/CelestiaVR/Scripts/Stars/StarCatalogParser.cs
+
+DECISION 6 — Magnitude limit of 6.5
+  What: Filter the 119k catalog to only stars with apparent magnitude ≤ 6.5.
+  Why 6.5: The human naked-eye limit under ideal dark skies is ~6.5 magnitude.
+            The magnitude scale is logarithmic and inverted (brighter = lower).
+            Sirius is -1.46, the Sun is -26.7, faintest naked-eye stars ~6.5.
+  Result: ~6,000 stars pass the filter — a scientifically motivated cutoff,
+          not arbitrary. Rendering 6000 vs 119000 is also a huge performance win.
+  File: StarCatalogParser.cs, field: magnitudeLimit = 6.5f
+
+DECISION 7 — GPU instancing for billboard stars
+  What: Rendering 6000 stars as individual GameObjects with MeshRenderers
+        would mean 6000 draw calls per frame — not feasible in VR (need 72fps).
+        Instead: Graphics.DrawMeshInstanced() batches up to 1023 quads per
+        draw call, with per-instance color/size data passed via MaterialPropertyBlock.
+        6000 stars = ~6 draw calls total.
+  What billboards are: Each star is a flat quad (2 triangles) that always faces
+        the camera. Size on screen encodes magnitude. Color encodes spectral type.
+  File: Assets/CelestiaVR/Scripts/Stars/StarRenderer.cs
+  Shader: Assets/CelestiaVR/Shaders/StarBillboard.shader (URP additive)
+
+DECISION 8 — Named star split: 3D spheres vs billboards
+  What: Stars brighter than magnitude 3.0 that have a proper name (~60 stars:
+        Sirius, Betelgeuse, Vega, Rigel, etc.) are spawned as actual 3D
+        GameObject spheres with:
+          - Glowing material (emissive)
+          - SphereCollider (for raycasts and gaze detection)
+          - Glow halo child object
+          - CelestialBody component (for inspection data)
+        All fainter/unnamed stars use the GPU-instanced billboard system.
+  Why split: GPU instanced quads don't exist as individual GameObjects — no
+        colliders possible, no per-object interaction. The named stars are few
+        enough to afford individual objects.
+  Anti-double-render gate: StarRenderer skips any star that's in the named
+        star set (namedStarSphereThreshold = 3.0f) to avoid drawing a faint
+        billboard behind a bright sphere.
+  Files: Stars/NamedStarSpawner.cs, Stars/StarRenderer.cs
+
+DECISION 9 — B-V color index to RGB
+  What: The HYG catalog includes B-V (Blue minus Visual magnitude), which is
+        an astrophysical proxy for star surface temperature:
+          B-V ≈ -0.4  →  O/B type  →  blue-white  (e.g. Rigel, Spica)
+          B-V ≈  0.0  →  A type    →  white        (e.g. Sirius, Vega)
+          B-V ≈  0.65 →  G type    →  yellow-white (e.g. the Sun)
+          B-V ≈  1.5  →  M type    →  deep orange-red (e.g. Betelgeuse)
+  Implementation: Piecewise linear lookup table in CelestialCoordinates.cs
+        mapping B-V float → Color (RGB). Each star renders its scientifically
+        correct color rather than all white.
+  File: Assets/CelestiaVR/Scripts/Core/CelestialCoordinates.cs
+
+── ACT 3: COORDINATES & MOTION ────────────────────────────────────────────────
+
+DECISION 10 — RA/Dec to Unity Vector3
+  What: Stars in the HYG catalog are given in equatorial coordinates:
+          RA  = right ascension (0–24 hours, like longitude on the celestial sphere)
+          Dec = declination (-90° to +90°, like latitude)
+        Must convert to Unity world-space unit vectors for placement.
+  Formula:
+          x = cos(dec) * cos(ra_radians)
+          y = sin(dec)
+          z = cos(dec) * sin(ra_radians)
+        Then apply sky rotation matrix (sidereal time + observer latitude).
+  File: CelestialCoordinates.cs, method: RADecToDirection()
+
+DECISION 11 — Sidereal time for sky rotation
+  What: The sky appears to rotate once per sidereal day (23h 56m 4s), not
+        solar day (24h 0m 0s). The difference accumulates — after a year,
+        the sky has made one extra full rotation relative to the Sun.
+        Implemented Local Sidereal Time (LST) calculation from scratch.
+  File: SkyManager.cs drives SkyRotation; SkyManager rotates the entire
+        sky hierarchy (SkySphere, StarField, ConstellationRoot) as a unit.
+
+DECISION 12 (BUG) — Sky rotating around world Y axis instead of celestial pole
+  What: Early implementation rotated the sky around Unity's world Y axis
+        (straight up, the zenith direction).
+  Problem: Earth's rotation axis is tilted 23.5° from its orbital plane.
+           The celestial pole (Polaris direction) is NOT straight up — it's
+           23.5° away from the zenith. Rotating around Y makes stars trace
+           the wrong arcs (e.g. Polaris would appear to circle the zenith
+           instead of staying nearly fixed).
+  Fix: Compute the pole axis vector = tilt the Y axis by observer latitude
+       and Earth's axial tilt, then rotate around that axis.
+  File: SkySphere.cs / SkyManager.cs
+
+── ACT 4: CONSTELLATIONS ──────────────────────────────────────────────────────
+
+DECISION 13 — Legacy two-script constellation system (abandoned)
+  What: Initial system had two separate scripts:
+          ConstellationHIPRenderer.cs — draws stick figure lines
+          ConstellationArtRenderer.cs — places art quad images
+        Each managed its own data, both subscribed to OnCatalogLoaded.
+  Problem: Duplicated logic, broke easily, hard to toggle features,
+           both scripts silently conflicting when on same GameObject.
+  Outcome: Replaced entirely.
+
+DECISION 14 — Stellarium open-source constellation data
+  What: Stellarium (open-source planetarium) provides in index.json:
+          - All 88 IAU constellation names
+          - HIP star ID pairs for stick figure lines (e.g. [27989, 27366])
+          - 3-anchor pixel-mapped art data per constellation:
+              Each anchor = (HIP star ID, pixel X, pixel Y) in the art image
+              3 anchors define the affine transform from pixel→sky space
+          - Artwork PNGs for 85 constellations (CC-BY-SA license)
+  Files: index.json parsed at startup, PNGs in Assets/Resources/ConstellationArt/
+
+DECISION 15 — StellariumLoader: unified constellation system
+  What: Single script replacing both legacy scripts.
+        At OnCatalogLoaded:
+          1. Reads HIP pairs → spawns LineRenderer per constellation (88 total)
+          2. For each constellation with art: reads 3 anchors, computes affine
+             transform from pixel space to sky direction space, places a quad
+             billboard at the correct sky position/orientation/scale.
+        StellariumLoader disables the legacy scripts if present on the same GO.
+  File: Assets/CelestiaVR/Scripts/Constellations/StellariumLoader.cs
+
+DECISION 16 — Affine pixel→sky transform for art placement
+  What: Each piece of constellation art (e.g. Orion artwork PNG) has 3 known
+        anchor points defined in pixel coordinates (u, v) and their matching
+        HIP star IDs. Since we know each HIP star's sky direction (unit vector),
+        we have 3 known (pixel → sky) correspondences.
+        An affine transform matrix is solved from these 3 point pairs.
+        This matrix maps any pixel in the artwork to the correct sky direction,
+        so the art quad is positioned, oriented, and scaled to exactly match
+        the real star positions — same as what Stellarium shows.
+  Why it matters: Without this, constellation art would need manual placement
+        for all 85 constellations. The affine approach is fully automatic and
+        pixel-accurate.
+
+── ACT 5: INTERACTION ──────────────────────────────────────────────────────────
+
+DECISION 17 — Gaze dwell selection
+  What: Primary selection method in VR. User looks at an object for 3 seconds
+        (dwell timer), then it gets selected. A ring fills around the reticle
+        to show progress.
+  Why: Meta Quest 3 has controllers but gaze is more natural for stargazing
+       (you look at a star, not aim a laser). Both methods supported.
+  File: Assets/CelestiaVR/Scripts/Interaction/DwellSelector.cs
+
+DECISION 18 (PROBLEM) — GPU instanced stars have no colliders
+  What: Stars rendered via Graphics.DrawMeshInstanced() don't exist as
+        individual GameObjects. There is no GameObject to attach a Collider
+        to. Physics raycasts cannot hit them. Standard gaze selection fails.
+  Scale of problem: ~6000 stars need to be gazeable with no physics primitives.
+
+DECISION 19 — Angular scan workaround (BillboardStarDwellDetector)
+  What: Every frame, scan all ~6000 star positions (unit vectors) by computing
+        the angle between the camera's gaze direction and each star's direction.
+        If any star falls within an angular threshold (~1.5°), it's the "gazed"
+        star. A single shared proxy GameObject is then repositioned to that
+        star's location and injected into DwellSelector as the target.
+        No colliders. No physics. Pure math.
+  Performance: 6000 dot products per frame — cheap, runs on CPU, no GPU overhead.
+  File: Assets/CelestiaVR/Scripts/Interaction/BillboardStarDwellDetector.cs
+
+DECISION 20 — Dwell timing issues
+  What: Initial dwell times felt too fast — hover-to-select was triggering
+        accidentally. SearchPanel items had separate shorter timers (1.5s
+        trigger, 2.5s item).
+  Fix: Increased both dwell times. SearchPanelDwellDetector adjusted.
+
+DECISION 21 — ViewingModeManager: Observe vs Inspect modes
+  What: Two distinct modes toggled by thumbstick click or M key:
+          Observe mode — look around, dwell does nothing, free exploration
+          Inspect mode — dwell/trigger selects and inspects objects
+        A floating HUD badge shows current mode.
+  Why: Without this, any accidental gaze would trigger inspections constantly
+       while the user just wants to look around.
+  File: Assets/CelestiaVR/Scripts/Interaction/ViewingModeManager.cs
+
+DECISION 22 — InspectionController: hologram pull-out
+  What: When a celestial body is selected, a hologram copy animates out from
+        the object toward the user. After 1 second, real-scale mode auto-triggers
+        if the object has a known physical radius.
+  Dynamic distance formula: push distance = 3.5 × hologram radius, capped at 4m.
+        Tiny asteroid → doesn't float 5cm from face.
+        Giant star → doesn't appear 200m away.
+  File: Assets/CelestiaVR/Scripts/Interaction/InspectionController.cs
+
+DECISION 23 — Real scale comparison with Earth reference
+  What: When inspecting a body with a known physical radius, an Earth-sized
+        sphere appears beside the hologram, connected by a line, labeled with
+        the ratio (e.g. "11.2× Earth" for Jupiter).
+  Why: Magnitudes and distances are abstract. Seeing Jupiter 11× Earth's size
+       next to an Earth sphere is immediately tangible in VR.
+  File: Assets/CelestiaVR/Scripts/Interaction/RealScaleComparison.cs
+
+── ACT 6: XR-SPECIFIC PROBLEMS ────────────────────────────────────────────────
+
+DECISION 24 — XRBaseInteractable.MovementType enum mismatch
+  What: XRI 3.3.0 had MovementType enum values that differed from docs.
+        InstantaneousMovement didn't exist as expected. Had to read actual
+        prefab YAML files to map enum integer values correctly.
+
+DECISION 25 — XR ray visuals disabled programmatically
+  What: XR Interaction Toolkit shows laser pointer visuals (XRInteractorLineVisual,
+        XRInteractorReticleVisual) by default. These looked wrong in the scene.
+        Could not reliably disable via inspector (scene reloads reset them).
+  Fix: StargazingSceneBootstrap.cs calls DisableXRInteractorVisuals() at Start,
+       finding and disabling all such components via GetComponentsInChildren.
+
+DECISION 26 — InspectionPanel must NEVER be SetActive(false)
+  What: Unity Coroutines stop if their MonoBehaviour's GameObject is deactivated.
+        InspectionPanel.cs runs several animation coroutines.
+  Bug: Early version used SetActive(false) to hide the panel. This killed
+       running coroutines — animations would start but never finish on re-show.
+  Fix: ONLY use CanvasGroup.alpha = 0 for hiding, never SetActive(false).
+       StargazingSceneBootstrap force-activates InspectionPanel at startup.
+
+DECISION 27 — StargazingSceneBootstrap auto-wiring
+  What: A single script that at Start() wires all cross-component references:
+        DwellSelector.gazeCamera, SelectionManager↔InspectionController,
+        auto-creates SkyLabelManager, auto-creates ViewingModeManager, etc.
+  Why: Avoids "drag reference in inspector" for 15+ cross-references that
+       break whenever prefabs reset or scenes reload.
+  File: Assets/CelestiaVR/Scripts/Core/StargazingSceneBootstrap.cs
+
+── ACT 7: UI & SEARCH ─────────────────────────────────────────────────────────
+
+DECISION 28 — CelestialSearchPanel → ControlPanel redesign
+  What: Original search had two components (CelestialSearchPanel +
+        SearchPanelDwellDetector). Replaced with unified ControlPanel:
+          - Left X button to open
+          - Scrollable search list (right thumbstick Y to scroll)
+          - Constellation lines/art/planet-labels toggles
+          - Controller ray + trigger for instant selection
+          - Gaze dwell fallback
+  File: Assets/CelestiaVR/Scripts/UI/ControlPanel.cs
+
+DECISION 29 — Directional arrow redesign
+  What: Original was an ASCII "^" character pointing toward search targets.
+        Replaced with:
+          - Compass ring (always visible on HUD)
+          - Chevron arrow rotating toward target
+          - Fades when target within 20° (reticle takes over)
+        SearchTargetReticle: Stellarium-style ring+crosshair rendered AT the
+          actual target object in sky (not on HUD). Turns green within 5°.
+
+── ACT 8: ENVIRONMENT ─────────────────────────────────────────────────────────
+
+DECISION 30 — Tropical island grounding environment
+  What: Rather than floating in void, user stands on a tropical island.
+        Model: Assets/CelestiaVR_resources/Environment/tropical_island.glb (69MB)
+  Why: Gives embodied presence — you're somewhere real looking up at the sky,
+       not disembodied in space.
+
+DECISION 31 — Fireplace mini-game
+  What: Late addition for interactivity beyond passive stargazing.
+        FlareGun (XRGrabInteractable) fires physics projectiles.
+        Projectile collision uses tag-based detection ("Fireplace" tag).
+        On hit: fire VFX spawns, crackling spatial audio, point light flicker.
+  Files: Assets/CelestiaVR/Scripts/Island/ (GunInteraction, ProjectileController,
+         FireplaceBootstrap)
+  Models: flare_gun.glb, small_fire_place.glb, lowpoly_stick_-_01.glb
+
+DECISION 32 — Day/night system
+  What: DayNightController drives:
+          - StarRenderer.GlobalBrightnessFade (stars fade proportionally at dawn)
+          - Ambient light blend
+          - Alpha-blended blue sky dome fades in
+  File: Assets/CelestiaVR/Scripts/Environment/DayNightController.cs
+
+--------------------------------------------------------------------------------
+SECTION 3: ALL CANDIDATE MANIM SCENES
+--------------------------------------------------------------------------------
+
+Listed in development timeline order with visual potential rating.
+
+ACT 1 — Sky Background
+  A. Cube unwrap + pole distortion → inverted sphere       [FINALISED — Scene 1]
+  B. StarNet point star removal (before/after)             [FINALISED — Scene 3]
+
+ACT 2 — Star Catalog
+  C. 119k → 6000 magnitude filter                         [FINALISED — Scene 2]
+  D. GPU instancing: 6000 quads → ~6 draw call batches    [candidate]
+  E. Named star split: bright spheres vs faint billboards  [candidate]
+
+ACT 3 — Coordinates & Motion
+  F. RA/Dec → Unity Vector3 on celestial sphere           [candidate]
+  G. Wrong rotation axis (world Y) vs correct pole axis    [rejected by user]
+  H. Sidereal vs solar day drift                           [candidate]
+
+ACT 4 — Constellations
+  I. HIP integer pairs → stick figure lines forming        [candidate]
+  J. Affine pixel→sky transform for constellation art      [FINALISED — Scene 4]
+
+ACT 5 — Interaction
+  K. Gaze angular scan for billboard stars (no colliders)  [FINALISED — Scene 5]
+  L. Dwell timer ring filling                              [candidate]
+
+ACT 6 — Inspection
+  M. Dynamic hologram distance formula                     [candidate]
+  N. Real scale comparison: Earth sphere + ratio label     [FINALISED — Scene 6]
+
+--------------------------------------------------------------------------------
+SECTION 4: FINALISED SCENES — DETAILED PROMPTS
+--------------------------------------------------------------------------------
+
+STYLE GUIDE (apply to all scenes):
+  - Dark background (#0a0a1a — near-black, deep space feel)
+  - Accent colors: star-yellow (#FFD700), nebula-blue (#4FC3F7),
+    constellation-teal (#80CBC4), error-red (#EF5350), success-green (#66BB6A)
+  - Font: clean sans-serif, white or light-gray text
+  - Each scene: 20–40 seconds
+  - Transitions: FadeIn/FadeOut between major beats
+  - No voiceover in the animation itself (will be narrated live or in video)
+  - Subtle particle/dot background to maintain space atmosphere throughout
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 1 — "The Skybox Problem"
+Topic: 6-sided cubemap distortion → custom inverted sphere
+Position in story: First thing built. The sky background.
+Duration target: ~30 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  The naive approach — Unity's default skybox — maps a panoramic image onto
+  6 cube faces. This warps the poles. Our fix: a sphere turned inside-out.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–8s): Show a 3D cube. Animate it unfolding like a net into 6 flat
+  faces (cross pattern). Label it "6-sided Cubemap". Show an equirectangular
+  Milky Way panorama (can be approximated as a horizontal band of dots/colors
+  representing the galaxy) mapping onto the faces. The top and bottom faces
+  visually squish/stretch the band — show the distortion with curved warp
+  lines or a grid that bends on the top face. Flash a red X or highlight the
+  problem area.
+
+Beat 2 (8–18s): Transition. The cube folds back up. Then morph into a sphere.
+  Label it "Inverted Sphere (SkySphere)". Show the same equirectangular map
+  wrapping cleanly around the sphere. Show a small camera/eye dot INSIDE the
+  sphere. Flip all the surface normals inward (can show small arrows on surface
+  pointing inward instead of out). The panorama now maps without distortion —
+  show the grid lines staying uniform all the way to the poles.
+
+Beat 3 (18–28s): Show a cross-section view: camera inside the sphere, rays
+  shooting outward to the inner surface. The Milky Way band appears cleanly
+  curved around the inside. Text: "No pole distortion. Full 360°." Green
+  checkmark.
+
+KEY VISUAL ELEMENTS:
+  - Cube net unfolding animation
+  - Grid overlay showing warp/distortion (red) vs clean (green)
+  - Small camera dot inside sphere for POV clarity
+  - Normal arrows flipping direction (outward → inward) to show the "invert"
+  - The equirectangular texture represented as a gradient band of star dots
+
+MANIM OBJECTS NEEDED:
+  Cube (with unfolding), Sphere, camera dot, grid lines, normal arrows,
+  text labels, color gradient band for Milky Way representation,
+  warp distortion lines (red curved paths), green tick.
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 2 — "6000 Out of 119,000"
+Topic: Magnitude filter reducing 119k stars to ~6000 renderable stars
+Position in story: After we have the catalog, before we render anything.
+Duration target: ~25 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  The HYG database has 119,000 stars. We can't render all of them in VR.
+  Apparent magnitude is the key — filter to what the human eye can see.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–6s): Fill the screen with 119,000 tiny white dots scattered
+  randomly (simulate a star field). Counter animates up: "119,000 stars".
+  They all look the same initially.
+
+Beat 2 (6–14s): Introduce a vertical axis on the right side labeled
+  "Apparent Magnitude". Mark key values:
+    -1.5  → Sirius (label it, make it bright yellow)
+     0    → Vega
+     1    → typical bright star
+     3    → binocular limit
+     6.5  → naked eye limit (dark sky) ← THRESHOLD LINE (draw as horizontal
+             dashed line across the scene)
+    10+   → telescope required
+  Dots reposition or vary in brightness according to their magnitude.
+
+Beat 3 (14–22s): The threshold line at 6.5 sweeps across. All dots above
+  the line (magnitude > 6.5, too faint) fade out simultaneously or get swept
+  away. Counter counts down rapidly to ~6,000. The remaining dots pulse once
+  to confirm they're the kept set.
+
+Beat 4 (22–25s): Text appears: "Magnitude ≤ 6.5 — the naked-eye limit."
+  Small note: "Logarithmic scale. Each step = 2.5× brightness difference."
+
+KEY VISUAL ELEMENTS:
+  - Dense dot field (use numpy-style random placement, vary dot sizes)
+  - Animated magnitude axis (vertical number line)
+  - Sweeping threshold line
+  - Dots fading out above threshold
+  - Animated counter: 119,000 → ~6,000
+  - Reference stars labeled (Sirius, Vega) with brightness halos
+
+MANIM OBJECTS NEEDED:
+  Dot cloud (VGroup of Dots), NumberLine, DashedLine threshold,
+  animated counter (DecimalNumber or Integer), FadeOut for dots,
+  text labels for reference stars.
+
+NOTE ON MAGNITUDE SCALE: Lower number = brighter. Sirius is -1.46.
+  Sun is -26.7. Faintest naked-eye is +6.5. Counter-intuitive — consider
+  a brief annotation explaining "lower = brighter".
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 3 — "Removing the Stars to Add Them Back"
+Topic: StarNet AI tool removing point stars from the NASA/ESO Milky Way image
+Position in story: After SkySphere, before HYG catalog rendering.
+Duration target: ~30 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  The NASA/ESO Milky Way photo has real stars baked in. If we render our
+  catalog stars ON TOP, every star near the galactic plane appears twice.
+  Solution: use an AI tool (StarNet) to erase the point stars, keeping
+  only the gas and dust clouds. Then layer our programmatic stars on top.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–8s): Show the SkySphere from Scene 1 (simplified). Two layers
+  appear labeled:
+    Layer 1 (bottom): "NASA/ESO Photo" — show as a soft glowing band with
+      scattered sharp bright point-dots (representing baked-in photo stars)
+    Layer 2 (top): "HYG Catalog Stars" — show as crisp glowing dots
+  Where the layers overlap, zoom into one spot: two dots at the same position —
+  one blurry (photo), one sharp (programmatic). A magnifying circle shows
+  the double. Label: "Double star artifact".
+
+Beat 2 (8–18s): A tool icon or label "StarNetv2 (AI)" appears.
+  The point stars in Layer 1 begin to dissolve/fade away individually
+  (animate as small dots shrinking to nothing). The diffuse glow/cloud
+  remains — the gas and dust. The sharp HYG stars on Layer 2 remain.
+  Label updates: Layer 1 becomes "Gas & Dust Only".
+
+Beat 3 (18–28s): Show the final clean result — two layers now composited
+  without conflict. Zoom back out to the sphere view. The single remaining
+  stars at each position are clean and crisp. Text: "One star per position."
+  Green checkmark.
+
+Beat 4 (28–30s): Small label: "milkyway_gas_only.tif — 46MB processed output"
+
+KEY VISUAL ELEMENTS:
+  - Two stacked translucent layer panels (like Photoshop layers) on a sphere
+  - Blurry dot vs sharp dot comparison in magnifying circle
+  - Point stars dissolving/shrinking animation (the AI removal)
+  - Diffuse nebulosity glow persisting after stars removed
+  - Clean final composite
+
+MANIM OBJECTS NEEDED:
+  Rectangle panels (layers), Dot objects (sharp and blurred/larger),
+  Circle magnifier, FadeOut animation for point-star dots,
+  GaussianBlur approximation (larger, dimmer dot for photo star),
+  text labels, green tick.
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 4 — "Placing Art Across the Sky"
+Topic: Affine pixel→sky transform for constellation art placement
+Position in story: After catalog + rendering, when we add constellations.
+Duration target: ~35 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  Stellarium provides constellation artwork. Each piece has 3 known anchor
+  points (pixel coordinates in the PNG) linked to 3 known HIP star IDs.
+  We know where those stars are in the sky. From 3 point-pairs, we solve
+  an affine transform and place the art quad exactly where it belongs.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–8s): Show a flat 2D rectangle representing a constellation art PNG
+  (e.g. Orion). On it, mark 3 anchor points as colored dots (red, green, blue).
+  Label each: "(pixel_x, pixel_y)". Show their pixel coordinates as numbers.
+  Title: "Pixel Space"
+
+Beat 2 (8–18s): On the right side, show a portion of the night sky (dark
+  background with a few star dots). Highlight 3 stars with matching colors
+  (red, green, blue dots). Label each with its HIP number and its sky direction
+  vector (θ, φ) or (RA, Dec). Title: "Sky Space".
+  Draw matching colored arrows from each image anchor to its sky star.
+  Label the correspondence: "3 known pairs".
+
+Beat 3 (18–28s): Animate a matrix or grid of transformation arrows. Label:
+  "Affine Transform (3×3 matrix)". Show the flat image rectangle being
+  warped/rotated/scaled and then projected as a quad into the 3D sky sphere.
+  The 3 anchor points on the image snap exactly onto their 3 sky stars (the
+  colored dots align perfectly). The art quad settles in place on the sphere.
+
+Beat 4 (28–35s): Zoom out to show multiple constellations placed the same way.
+  Counter: "85 constellations — automatically placed."
+  Text: "No manual positioning. Pixel-accurate."
+
+KEY VISUAL ELEMENTS:
+  - Flat image rectangle with 3 colored anchor dots
+  - Side-by-side: pixel space (left) ↔ sky space (right)
+  - Matching colored arrows linking anchor to star
+  - Matrix symbol or transform arrow in the middle
+  - Rectangle morphing into a 3D quad on a sphere surface
+  - Anchor points snapping to stars (satisfying alignment animation)
+
+MANIM OBJECTS NEEDED:
+  Rectangle (image proxy), Dot × 3 (colored anchors), Star/dot objects
+  in sky, Arrow connections, transformation matrix label,
+  3D sphere (or simplified curved surface), NumberPlane or grid
+  for pixel space, VGroup animations for snap-to-star.
+
+TECHNICAL CONTEXT FOR PROMPT:
+  An affine transform in 2D maps: [u, v, 1] → [x, y, z] via a 3×3 matrix.
+  Solved from 3 point correspondences. Applied to every pixel of the art image
+  to find its sky direction. In practice, just the 4 corners of the image quad
+  are transformed to get the 3D quad placement.
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 5 — "Looking Without Touching"
+Topic: Angular scan workaround for gaze detection on GPU-instanced stars
+Position in story: After stars render, when we add interaction.
+Duration target: ~35 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  6000 stars are GPU-instanced quads — no GameObjects, no colliders.
+  Standard VR raycasting can't hit them. Solution: every frame, scan all
+  6000 star positions by angle from gaze direction. Nearest star within
+  a threshold angle becomes the selection target.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–10s): Show a scene: camera/eye on the left, a field of dot-stars
+  on the right. Show a physics raycast beam shooting from camera into the
+  star field. It passes THROUGH all the stars — no hits. One star even gets
+  a "missed" indicator (line passes through it with no response).
+  Label: "No Colliders. Raycast misses." Red X appears.
+  Small label: "GPU Instancing = no GameObjects = no physics"
+
+Beat 2 (10–22s): The raycast disappears. Instead, a cone/wedge shape
+  emanates from the camera's gaze direction — narrow angle threshold
+  (~1.5°). The cone sweeps or pulses outward. All star dots within the cone's
+  angular radius get highlighted briefly. The CLOSEST one (smallest angle
+  from center) gets a ring drawn around it. Label: "Angular threshold: ~1.5°"
+  Small dot labeled "Proxy GO" appears and snaps to the selected star's position.
+  Label: "Single shared proxy GameObject injected into DwellSelector"
+
+Beat 3 (22–32s): The proxy GO dot glows. A dwell ring begins filling around
+  it (partial arc, not full — just to show the concept). Text:
+  "6000 dot products per frame. No GPU overhead. No colliders needed."
+
+Beat 4 (32–35s): Pull back. Show the full star field with the cone scanning
+  as the camera view shifts slightly. Label: "BillboardStarDwellDetector.cs"
+
+KEY VISUAL ELEMENTS:
+  - Camera/eye icon on left
+  - Dense star dot field on right
+  - Raycast line passing through stars with no collision response
+  - Cone/wedge shape from gaze direction
+  - Stars inside cone briefly highlighted
+  - Nearest star gets selection ring
+  - Small "Proxy GO" dot jumping to selected star
+  - 6000 dot product counter or label
+
+MANIM OBJECTS NEEDED:
+  Camera icon (triangle or eye), Dot cloud (stars), Line (raycast),
+  Sector/Cone shape (angular threshold), Circle highlight ring,
+  dashed Arc (dwell progress), text labels, annotations.
+
+MATH TO SHOW (optional):
+  angle = arccos(dot(gazeDir, starDir))
+  if angle < threshold: candidate
+
+════════════════════════════════════════════════════════════════════════════════
+SCENE 6 — "How Big is That?"
+Topic: Real scale comparison — Earth sphere + ratio label next to hologram
+Position in story: Final feature, the payoff moment of inspection.
+Duration target: ~25 seconds
+════════════════════════════════════════════════════════════════════════════════
+
+NARRATIVE:
+  When inspecting a planet or star, abstract numbers ("142,984 km diameter")
+  mean nothing. Placing an Earth-sized sphere next to the hologram and
+  showing the ratio makes the scale viscerally real in VR.
+
+BEAT-BY-BEAT:
+
+Beat 1 (0–8s): Show a hologram of Jupiter (large glowing sphere, banded
+  texture or just a large orange/tan gradient sphere). It floats in dark space.
+  An info panel nearby shows: "Jupiter — Diameter: 142,984 km". Text floats
+  near it. A user silhouette or VR headset icon nearby for scale reference.
+
+Beat 2 (8–18s): A small blue sphere (Earth, ~1/11 the size of Jupiter)
+  materializes beside Jupiter. A line draws between their centers.
+  A label animates in: "11.2× Earth". The size difference is visually
+  striking. The Earth sphere pulses softly.
+  Then transition: swap Jupiter for the Sun. Earth becomes tiny. Label:
+  "109× Earth". Then swap for a neutron star or white dwarf — Earth is
+  suddenly HUGE. Label: "Earth > this star". Show the dynamic range.
+
+Beat 3 (18–23s): Pull back. Show the formula/logic:
+  "push distance = 3.5 × hologram radius, capped at 4m"
+  Show a diagram: tiny asteroid on left (hologram close), giant star on right
+  (hologram at 4m cap). Both usable. Text: "Dynamic distance — always readable."
+
+Beat 4 (23–25s): Text: "Abstract numbers → embodied scale in VR."
+
+KEY VISUAL ELEMENTS:
+  - Large glowing planet sphere (Jupiter colors)
+  - Small blue Earth sphere appearing beside it
+  - Line between centers with ratio label
+  - Dynamic scale comparison (Jupiter → Sun → white dwarf)
+  - Dynamic distance diagram (small vs large objects, hologram placement)
+  - Earth sphere as constant reference
+
+MANIM OBJECTS NEEDED:
+  Sphere objects (various radii), Circle (2D cross-sections work fine),
+  Line between centers, DecimalNumber for ratio label,
+  animated resize/transform, info panel rectangle + text,
+  user silhouette or simple VR headset shape.
+
+--------------------------------------------------------------------------------
+SECTION 5: SUGGESTED VIDEO STRUCTURE
+--------------------------------------------------------------------------------
+
+For the 2–5 min promotional video:
+
+  0:00–0:30  Scene 1 — Skybox cube distortion → inverted sphere
+  0:30–0:50  Problem statement slide (text/motion graphics)
+             "Most VR stargazing apps use flat images or low-res skyboxes."
+  0:50–1:15  Scene 2 — 119k → 6000 magnitude filter
+  1:15–1:45  Scene 3 — StarNet star removal
+  1:45–2:00  Brief: app footage (headset screen capture) — walking on island,
+             looking up at the real night sky
+  2:00–2:35  Scene 4 — Affine pixel→sky constellation art placement
+  2:35–3:10  Scene 5 — Gaze angular scan (billboard star interaction)
+  3:10–3:30  App footage — interaction loop (gaze, dwell, hologram pull-out)
+  3:30–3:55  Scene 6 — Real scale comparison
+  3:55–4:20  User evaluation results slide + performance numbers
+  4:20–4:50  Limitations + future work slide
+  4:50–5:00  Credits (Stellarium CC-BY-SA, NASA/ESO, HYG catalog)
+
+For the live demo teaser slide (optional, 1 slide permitted):
+  Use a static frame from Scene 1 or a composite of all 6 scenes as panels.
+  Should fit on one slide. Keep it visual, minimal text.
+
+--------------------------------------------------------------------------------
+SECTION 6: MANIM SETUP NOTES
+--------------------------------------------------------------------------------
+
+Recommended Manim version: ManimCE (Community Edition) latest stable
+Python: 3.10+
+Install: pip install manim
+
+Rendering command per scene:
+  manim -pql scene_file.py SceneName        # quick low quality preview
+  manim -pqh scene_file.py SceneName        # high quality final render
+  manim -pqk scene_file.py SceneName        # 4K render
+
+Output: MP4 in media/videos/
+
+Global config to add in each file:
+  config.background_color = "#0a0a1a"
+  config.frame_rate = 60
+
+Color constants to define at top of each file:
+  SPACE_BG    = "#0a0a1a"
+  STAR_YELLOW = "#FFD700"
+  NEBULA_BLUE = "#4FC3F7"
+  CONSTEL_TEAL = "#80CBC4"
+  ERROR_RED   = "#EF5350"
+  SUCCESS_GREEN = "#66BB6A"
+  EARTH_BLUE  = "#1565C0"
+  JUPITER_TAN = "#C8A882"
+
+Scene class naming convention:
+  Scene1_SkyboxProblem
+  Scene2_MagnitudeFilter
+  Scene3_StarNetRemoval
+  Scene4_ConstellationAffine
+  Scene5_GazeAngularScan
+  Scene6_RealScaleComparison
+
+Each scene should be a self-contained class in its own .py file.
+No dependencies between scene files.
+
+--------------------------------------------------------------------------------
+END OF REFERENCE DOCUMENT
+--------------------------------------------------------------------------------
