@@ -19,6 +19,8 @@ namespace CelestiaVR.Island
         private Transform _xrOrigin;
         private float     _floorY;
 
+        private const float SpawnHeightAboveFloor = 1.5f;
+
         private void Start()
         {
             _xrOrigin = FindXROriginTransform();
@@ -29,19 +31,25 @@ namespace CelestiaVR.Island
             }
             else if (_xrOrigin != null)
             {
-                // The XR Origin's starting Y is the most reliable floor reference —
-                // the designer placed it exactly on the island surface.
                 _floorY = _xrOrigin.position.y;
             }
 
-            Debug.Log($"[IslandFloorGuard] Floor clamped at Y={_floorY:F3}");
+            // Lift the player above the island surface so they aren't buried in the ground
+            if (_xrOrigin != null)
+            {
+                var spawnPos = _xrOrigin.position;
+                spawnPos.y = _floorY + SpawnHeightAboveFloor;
+                _xrOrigin.position = spawnPos;
+            }
+
+            Debug.Log($"[IslandFloorGuard] Floor at Y={_floorY:F3}, spawn at Y={_floorY + SpawnHeightAboveFloor:F3}");
         }
 
         private void LateUpdate()
         {
             if (_xrOrigin == null) return;
             var pos = _xrOrigin.position;
-            if (pos.y != _floorY)
+            if (pos.y < _floorY)
             {
                 pos.y = _floorY;
                 _xrOrigin.position = pos;

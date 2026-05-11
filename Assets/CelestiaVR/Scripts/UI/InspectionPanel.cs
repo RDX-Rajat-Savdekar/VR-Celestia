@@ -67,6 +67,7 @@ namespace CelestiaVR.UI
         private InputAction  _triggerAction;
         private bool         _triggerWasDown;
         private float        _btnDwellTimer;
+        private float        _triggerHoldTimer;
         private bool         _btnHovered;
         private GameObject   _realScaleBtnColliderGO;
         private LineRenderer _rayLine;
@@ -363,26 +364,44 @@ namespace CelestiaVR.UI
                     _realScaleBtnBg.color = didHit ? ColBtnHover : ColBtnIdle;
             }
 
-            if (!_btnHovered) { _triggerWasDown = GetRightTrigger(); return; }
+            if (!_btnHovered) { _triggerWasDown = GetRightTrigger(); _triggerHoldTimer = 0f; return; }
 
-            // Trigger = instant press
-            bool trig     = GetRightTrigger();
-            bool tPressed = trig && !_triggerWasDown;
+            // Trigger hold — require 0.5 s of continuous hold before activating
+            bool trig = GetRightTrigger();
+            if (trig)
+            {
+                _triggerHoldTimer += Time.deltaTime;
+                float holdFill = Mathf.Clamp01(_triggerHoldTimer / 0.5f);
+                if (_realScaleBtnBg != null)
+                    _realScaleBtnBg.color = Color.Lerp(ColBtnIdle, ColBtnHover, holdFill);
+                if (_triggerHoldTimer >= 0.5f)
+                {
+                    _triggerHoldTimer = 0f;
+                    _btnDwellTimer    = 0f;
+                    OnRealScaleButtonPressed();
+                }
+                _triggerWasDown = true;
+                return;
+            }
+            else
+            {
+                _triggerHoldTimer = 0f;
+            }
             _triggerWasDown = trig;
-            if (tPressed) { OnRealScaleButtonPressed(); return; }
 
-            // Dwell fallback (0.2 s — quick hold to activate Real Scale / Sky View)
+            // Dwell fallback (0.8 s — hover without trigger; fires once per hover entry)
             _btnDwellTimer += Time.deltaTime;
-            float t = _btnDwellTimer / 0.2f;
+            float t = Mathf.Clamp01(_btnDwellTimer / 0.8f);
             if (_realScaleBtnBg != null)
                 _realScaleBtnBg.color = Color.Lerp(ColBtnIdle, ColBtnHover, t);
-            if (_btnDwellTimer >= 0.2f) { _btnDwellTimer = 0f; OnRealScaleButtonPressed(); }
+            if (_btnDwellTimer >= 0.8f) { _btnDwellTimer = float.MaxValue; OnRealScaleButtonPressed(); }
         }
 
         private void ClearBtnHover()
         {
-            _btnHovered    = false;
-            _btnDwellTimer = 0f;
+            _btnHovered       = false;
+            _btnDwellTimer    = 0f;
+            _triggerHoldTimer = 0f;
             if (_realScaleBtnBg != null) _realScaleBtnBg.color = ColBtnIdle;
         }
 

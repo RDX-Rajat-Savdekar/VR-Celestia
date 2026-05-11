@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline"
     ]
   }
 }
