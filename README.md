@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | 📺 **[Demo video](https://www.youtube.com/watch?v=D05QMqR-XI0)** | The experience running on-device |
-| 🎬 **[Technical presentation](https://rdx-rajat-savdekar.github.io/Celestia_Presentation/)** | Animated walkthrough of the rendering pipeline, built with Manim |
+| 🎬 **[Technical presentation](https://rdx-rajat-savdekar.github.io/Celestia_Presentation/)** | Animated walkthrough of the rendering pipeline, built with Manim |    
 
 The presentation is the best place to start if you care about *how* it works — it covers each stage of the pipeline as a separate animated scene.
 
