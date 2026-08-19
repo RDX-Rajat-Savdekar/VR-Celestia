@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
 </p>
 
----
+---  
 
 ## See It In Action
 
