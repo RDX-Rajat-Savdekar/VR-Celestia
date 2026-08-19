@@ -28,7 +28,7 @@ The presentation is the best place to start if you care about *how* it works —
 CelestiaVR renders a star catalogue in virtual reality. Rather than placing a skybox texture around the user, it treats each star as real data — position, magnitude, and colour index — and projects it onto a celestial sphere centred on the viewer, so the sky is spatially correct rather than painted on.
 
 The engineering problem is throughput. A full catalogue contains far more stars than a standalone headset can draw naively at a comfortable framerate, and Quest 3 is mobile hardware running a tile-based GPU with a strict per-frame budget. The pipeline exists to get from raw catalogue data to a stable, comfortable frame: filter aggressively, transform once, and push the per-star work onto the GPU.
-
+   
 Built on Unity 6 with OpenXR, so it targets any compliant runtime — but Quest 3 standalone is the primary platform and the one the performance work is tuned for.
 
 ---
