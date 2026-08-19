@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/target-Meta%20Quest%203-1C1E20?style=flat-square&logo=meta" alt="Meta Quest 3" />
   <img src="https://img.shields.io/badge/OpenXR-supported-0095D5?style=flat-square" alt="OpenXR" />
   <img src="https://img.shields.io/badge/render_pipeline-URP-blueviolet?style=flat-square" alt="URP" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />   
 </p>
 
 ---  
